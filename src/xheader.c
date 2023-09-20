@@ -19,6 +19,7 @@
 
 #include <system.h>
 
+#include <c-ctype.h>
 #include <fnmatch.h>
 #include <hash.h>
 #include <inttostr.h>
@@ -192,12 +193,12 @@ xheader_set_keyword_equal (char *kw, char *eq)
       global = false;
     }
 
-  while (p > kw && isspace ((unsigned char) *p))
+  while (p > kw && c_isspace (*p))
     p--;
 
   *p = 0;
 
-  for (p = eq + 1; *p && isspace ((unsigned char) *p); p++)
+  for (p = eq + 1; *p && c_isspace (*p); p++)
     ;
 
   if (strcmp (kw, "delete") == 0)
@@ -616,7 +617,7 @@ decode_record (struct xheader *xhdr,
   while (*p == ' ' || *p == '\t')
     p++;
 
-  if (! ISDIGIT (*p))
+  if (! c_isdigit (*p))
     {
       if (*p)
 	ERROR ((0, 0, _("Malformed extended header: missing length")));
@@ -692,8 +693,8 @@ decx (void *data, char const *keyword, char const *value, size_t size)
     t->decoder (st, keyword, value, size);
   else
     WARNOPT (WARN_UNKNOWN_KEYWORD,
-	     (0, 0, _("Ignoring unknown extended header keyword '%s'"),
-	      keyword));
+	     (0, 0, _("Ignoring unknown extended header keyword %s"),
+	      quotearg_style (shell_escape_always_quoting_style, keyword)));
 }
 
 void
@@ -1445,7 +1446,7 @@ sparse_map_decoder (struct tar_stat_info *st,
       intmax_t u;
       char *delim;
 
-      if (!ISDIGIT (*arg))
+      if (!c_isdigit (*arg))
 	{
 	  ERROR ((0, 0, _("Malformed extended header: invalid %s=%s"),
 		  keyword, arg));

@@ -20,10 +20,14 @@
    Written by John Gilmore, on 1987-04-30.  */
 
 #include <system.h>
-#include <system-ioctl.h>
 
 #if HAVE_LINUX_FD_H
 # include <linux/fd.h>
+#endif
+
+#if HAVE_SYS_MTIO_H
+# include <sys/ioctl.h>
+# include <sys/mtio.h>
 #endif
 
 #include "common.h"
@@ -267,7 +271,6 @@ diff_link (void)
 				      current_stat_info.link_name));
 }
 
-#ifdef HAVE_READLINK
 static void
 diff_symlink (void)
 {
@@ -293,7 +296,6 @@ diff_symlink (void)
   if (linkbuf != buf)
     free (linkbuf);
 }
-#endif
 
 static void
 diff_special (void)
@@ -332,34 +334,37 @@ diff_special (void)
 static int
 dumpdir_cmp (const char *a, const char *b)
 {
-  size_t len;
-
   while (*a)
     switch (*a)
       {
       case 'Y':
       case 'N':
-	if (!strchr ("YN", *b))
+	/* If the null-terminated strings A and B are equal, other
+	   than possibly A's first byte being 'Y' where B's is 'N' or
+	   vice versa, advance A and B past the strings.
+	   Otherwise, return 1.  */
+	if (! (*b == 'Y' || *b == 'N'))
 	  return 1;
-	if (strcmp(a + 1, b + 1))
-	  return 1;
-	len = strlen (a) + 1;
-	a += len;
-	b += len;
-	break;
-
+	a++, b++;
+	FALLTHROUGH;
       case 'D':
-	if (strcmp(a, b))
+	/* If the null-terminated strings A and B are equal, advance A
+	   and B past them.  Otherwise, return 1.  */
+	while (*a)
+	  if (*a++ != *b++)
+	    return 1;
+	if (*b)
 	  return 1;
-	len = strlen (a) + 1;
-	a += len;
-	b += len;
+	a++, b++;
 	break;
 
       case 'R':
       case 'T':
       case 'X':
 	return *b;
+
+      default:
+	unreachable ();
       }
   return *b;
 }
@@ -496,11 +501,9 @@ diff_archive (void)
       diff_link ();
       break;
 
-#ifdef HAVE_READLINK
     case SYMTYPE:
       diff_symlink ();
       break;
-#endif
 
     case CHRTYPE:
     case BLKTYPE:

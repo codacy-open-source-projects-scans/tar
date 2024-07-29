@@ -32,6 +32,7 @@ closeout
 configmake
 dirname
 dup2
+errno
 error
 exclude
 extern-inline
@@ -63,7 +64,9 @@ human
 idx
 inttostr
 inttypes
+largefile
 lchown
+limits-h
 linkat
 localcharset
 manywarnings
@@ -85,12 +88,15 @@ renameat
 root-uid
 rpmatch
 full-read
+safe-read
 savedir
 selinux-at
 setenv
 snprintf
 stat-time
+std-gnu23
 stdbool
+stddef
 stdint
 stpcpy
 stdopen
@@ -102,6 +108,7 @@ strtol
 strtoul
 strtoumax
 symlinkat
+sys_stat
 timespec
 timespec-sub
 unlinkat

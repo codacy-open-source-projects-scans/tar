@@ -16,7 +16,11 @@
    with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include <system.h>
-#include <system-ioctl.h>
+
+#if HAVE_SYS_MTIO_H
+# include <sys/ioctl.h>
+# include <sys/mtio.h>
+#endif
 
 #include "common.h"
 #include <priv-set.h>
@@ -25,6 +29,8 @@
 #include <wordsplit.h>
 #include <poll.h>
 #include <parse-datetime.h>
+
+bool dev_null_output;
 
 static _Noreturn void
 xexec (const char *cmd)
@@ -69,7 +75,7 @@ mtioseek (bool count_files, off_t count)
   return false;
 }
 
-#if MSDOS
+#if !HAVE_WAITPID /* MingW, MSVC 14.  */
 
 bool
 sys_get_archive_stat (void)
@@ -161,8 +167,6 @@ sys_exec_setmtime_script (const char *script_name,
   FATAL_ERROR ((0, 0, _("--set-mtime-command not implemented on this platform")));
 }
 #else
-
-extern union block *record_start; /* FIXME */
 
 bool
 sys_get_archive_stat (void)

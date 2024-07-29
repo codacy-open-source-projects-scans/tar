@@ -30,6 +30,8 @@
 
 #include "common.h"
 
+dev_t root_device;
+
 static bool we_are_root;	/* true if our effective uid == 0 */
 static mode_t newdir_umask;	/* umask when creating new directories */
 static mode_t current_umask;	/* current umask (which is set to 0 if -p) */
@@ -1587,7 +1589,6 @@ extract_link (char *file_name, MAYBE_UNUSED int typeflag)
 static int
 extract_symlink (char *file_name, MAYBE_UNUSED int typeflag)
 {
-#ifdef HAVE_SYMLINK
   bool interdir_made = false;
 
   if (! absolute_names_option
@@ -1605,6 +1606,19 @@ extract_symlink (char *file_name, MAYBE_UNUSED int typeflag)
 	return 0;
 
       case RECOVER_NO:
+	if (!implemented (errno))
+	  {
+	    static bool warned;
+	    if (!warned)
+	      {
+		warned = true;
+		WARNOPT (WARN_SYMLINK_CAST,
+			 (0, 0,
+			  _("Attempting extraction of symbolic links"
+			    " as hard links")));
+	      }
+	    return extract_link (file_name, typeflag);
+	  }
 	symlink_error (current_stat_info.link_name, file_name);
 	return -1;
       }
@@ -1612,19 +1626,6 @@ extract_symlink (char *file_name, MAYBE_UNUSED int typeflag)
   set_stat (file_name, &current_stat_info, -1, 0, 0,
 	    SYMTYPE, false, AT_SYMLINK_NOFOLLOW);
   return 0;
-
-#else
-  static int warned_once;
-
-  if (!warned_once)
-    {
-      warned_once = 1;
-      WARNOPT (WARN_SYMLINK_CAST,
-	       (0, 0,
-		_("Attempting extraction of symbolic links as hard links")));
-    }
-  return extract_link (file_name, typeflag);
-#endif
 }
 
 #if S_IFCHR || S_IFBLK

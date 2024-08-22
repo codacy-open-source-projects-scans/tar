@@ -51,28 +51,29 @@ static uid_t uid_from_header (const char *buf, size_t size);
 static intmax_t from_header (const char *, size_t, const char *,
 			     intmax_t, uintmax_t, bool, bool);
 
-/* Base 64 digits; see Internet RFC 2045 Table 1.  */
-static char const base_64_digits[64] =
-{
-  'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
-  'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
-  'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
-  'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
-  '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+', '/'
+/* Table of base-64 digit values + 1, indexed by unsigned chars.
+   See Internet RFC 2045 Table 1.
+   Zero entries are for unsigned chars that are not base-64 digits.  */
+static char const base64_map[UCHAR_MAX + 1] = {
+  ['A'] =  0 + 1, ['B'] =  1 + 1, ['C'] =  2 + 1, ['D'] =  3 + 1,
+  ['E'] =  4 + 1, ['F'] =  5 + 1, ['G'] =  6 + 1, ['H'] =  7 + 1,
+  ['I'] =  8 + 1, ['J'] =  9 + 1, ['K'] = 10 + 1, ['L'] = 11 + 1,
+  ['M'] = 12 + 1, ['N'] = 13 + 1, ['O'] = 14 + 1, ['P'] = 15 + 1,
+  ['Q'] = 16 + 1, ['R'] = 17 + 1, ['S'] = 18 + 1, ['T'] = 19 + 1,
+  ['U'] = 20 + 1, ['V'] = 21 + 1, ['W'] = 22 + 1, ['X'] = 23 + 1,
+  ['Y'] = 24 + 1, ['Z'] = 25 + 1,
+  ['a'] = 26 + 1, ['b'] = 27 + 1, ['c'] = 28 + 1, ['d'] = 29 + 1,
+  ['e'] = 30 + 1, ['f'] = 31 + 1, ['g'] = 32 + 1, ['h'] = 33 + 1,
+  ['i'] = 34 + 1, ['j'] = 35 + 1, ['k'] = 36 + 1, ['l'] = 37 + 1,
+  ['m'] = 38 + 1, ['n'] = 39 + 1, ['o'] = 40 + 1, ['p'] = 41 + 1,
+  ['q'] = 42 + 1, ['r'] = 43 + 1, ['s'] = 44 + 1, ['t'] = 45 + 1,
+  ['u'] = 46 + 1, ['v'] = 47 + 1, ['w'] = 48 + 1, ['x'] = 49 + 1,
+  ['y'] = 50 + 1, ['z'] = 51 + 1,
+  ['0'] = 52 + 1, ['1'] = 53 + 1, ['2'] = 54 + 1, ['3'] = 55 + 1,
+  ['4'] = 56 + 1, ['5'] = 57 + 1, ['6'] = 58 + 1, ['7'] = 59 + 1,
+  ['8'] = 60 + 1, ['9'] = 61 + 1,
+  ['+'] = 62 + 1, ['/'] = 63 + 1,
 };
-
-/* Table of base-64 digit values indexed by unsigned chars.
-   The value is 64 for unsigned chars that are not base-64 digits.  */
-static char base64_map[UCHAR_MAX + 1];
-
-static void
-base64_init (void)
-{
-  int i;
-  memset (base64_map, 64, sizeof base64_map);
-  for (i = 0; i < 64; i++)
-    base64_map[(int) base_64_digits[i]] = i;
-}
 
 static char *
 decode_xform (char *file_name, void *data)
@@ -171,7 +172,6 @@ read_and (void (*do_something) (void))
   enum read_header prev_status;
   struct timespec mtime;
 
-  base64_init ();
   name_gather ();
 
   open_archive (ACCESS_READ);
@@ -195,7 +195,7 @@ read_and (void (*do_something) (void))
 	  decode_header (current_header, &current_stat_info,
 			 &current_format, 1);
 	  if (! name_match (current_stat_info.file_name)
-	      || (TIME_OPTION_INITIALIZED (newer_mtime_option)
+	      || (time_option_initialized (newer_mtime_option)
 		  /* FIXME: We get mtime now, and again later; this causes
 		     duplicate diagnostics if header.mtime is bogus.  */
 		  && ((mtime.tv_sec
@@ -204,7 +204,7 @@ read_and (void (*do_something) (void))
 			 extended header.  */
 		      mtime.tv_nsec = 0,
 		      current_stat_info.mtime = mtime,
-		      OLDER_TAR_STAT_TIME (current_stat_info, m)))
+		      timespec_cmp (mtime, newer_mtime_option) < 0))
 	      || excluded_name (current_stat_info.file_name,
 				current_stat_info.parent))
 	    {
@@ -216,8 +216,8 @@ read_and (void (*do_something) (void))
 
 		case DIRTYPE:
 		  if (show_omitted_dirs_option)
-		    WARN ((0, 0, _("%s: Omitting"),
-			   quotearg_colon (current_stat_info.file_name)));
+		    paxwarn (0, _("%s: Omitting"),
+			     quotearg_colon (current_stat_info.file_name));
 		  FALLTHROUGH;
 		default:
 		  skip_member ();
@@ -243,9 +243,8 @@ read_and (void (*do_something) (void))
 	                            read_header_auto);
 	      if (status == HEADER_ZERO_BLOCK)
 		break;
-	      WARNOPT (WARN_ALONE_ZERO_BLOCK,
-		       (0, 0, _("A lone zero block at %jd"),
-			intmax (current_block_ordinal ())));
+	      warnopt (WARN_ALONE_ZERO_BLOCK, 0, _("A lone zero block at %jd"),
+		       intmax (current_block_ordinal ()));
 	      break;
 	    }
 	  status = prev_status;
@@ -253,9 +252,9 @@ read_and (void (*do_something) (void))
 
 	case HEADER_END_OF_FILE:
 	  if (!ignore_zeros_option)
-	    WARNOPT (WARN_MISSING_ZERO_BLOCKS,
-		     (0, 0, _("Terminating zero blocks missing at %jd"),
-		      intmax (current_block_ordinal ())));
+	    warnopt (WARN_MISSING_ZERO_BLOCKS, 0,
+		     _("Terminating zero blocks missing at %jd"),
+		     intmax (current_block_ordinal ()));
 	  if (block_number_option)
 	    fprintf (stdlis, _("block %jd: ** End of File **\n"),
 		     intmax (current_block_ordinal ()));
@@ -268,7 +267,7 @@ read_and (void (*do_something) (void))
 	  switch (prev_status)
 	    {
 	    case HEADER_STILL_UNREAD:
-	      ERROR ((0, 0, _("This does not look like a tar archive")));
+	      paxerror (0, _("This does not look like a tar archive"));
 	      FALLTHROUGH;
 	    case HEADER_ZERO_BLOCK:
 	    case HEADER_SUCCESS:
@@ -280,7 +279,7 @@ read_and (void (*do_something) (void))
 		  fprintf (stdlis, _("block %jd: "),
 			   intmax (block_ordinal));
 		}
-	      ERROR ((0, 0, _("Skipping to next header")));
+	      paxerror (0, _("Skipping to next header"));
 	      break;
 
 	    case HEADER_END_OF_FILE:
@@ -337,18 +336,13 @@ list_archive (void)
 enum read_header
 tar_checksum (union block *header, bool silent)
 {
-  size_t i;
   int unsigned_sum = 0;		/* the POSIX one :-) */
   int signed_sum = 0;		/* the Sun one :-( */
-  int recorded_sum;
-  int parsed_sum;
-  char *p;
 
-  p = header->buffer;
-  for (i = sizeof *header; i-- != 0;)
+  for (int i = 0; i < sizeof *header; i++)
     {
-      unsigned_sum += (unsigned char) *p;
-      signed_sum += (signed char) (*p++);
+      unsigned char uc = header->buffer[i]; unsigned_sum += uc;
+      signed   char sc = header->buffer[i];   signed_sum += sc;
     }
 
   if (unsigned_sum == 0)
@@ -356,21 +350,19 @@ tar_checksum (union block *header, bool silent)
 
   /* Adjust checksum to count the "chksum" field as blanks.  */
 
-  for (i = sizeof header->header.chksum; i-- != 0;)
+  for (int i = 0; i < sizeof header->header.chksum; i++)
     {
-      unsigned_sum -= (unsigned char) header->header.chksum[i];
-      signed_sum -= (signed char) (header->header.chksum[i]);
+      unsigned char uc = header->header.chksum[i]; unsigned_sum -= uc;
+      signed   char sc = header->header.chksum[i];   signed_sum -= sc;
     }
   unsigned_sum += ' ' * sizeof header->header.chksum;
-  signed_sum += ' ' * sizeof header->header.chksum;
+  signed_sum   += ' ' * sizeof header->header.chksum;
 
-  parsed_sum = from_header (header->header.chksum,
-			    sizeof header->header.chksum, 0,
-			    0, INT_MAX, true, silent);
-  if (parsed_sum < 0)
+  int recorded_sum = from_header (header->header.chksum,
+				  sizeof header->header.chksum, 0,
+				  0, INT_MAX, true, silent);
+  if (recorded_sum < 0)
     return HEADER_FAILURE;
-
-  recorded_sum = parsed_sum;
 
   if (unsigned_sum != recorded_sum && signed_sum != recorded_sum)
     return HEADER_FAILURE;
@@ -483,7 +475,7 @@ read_header (union block **return_block, struct tar_stat_info *info,
 		  data_block = find_next_block ();
 		  if (! data_block)
 		    {
-		      ERROR ((0, 0, _("Unexpected EOF in archive")));
+		      paxerror (0, _("Unexpected EOF in archive"));
 		      break;
 		    }
 		  written = available_space_after (data_block);
@@ -757,11 +749,11 @@ from_header (char const *where0, size_t digs, char const *type,
       if (where == lim)
 	{
 	  if (type && !silent)
-	    ERROR ((0, 0,
-		    /* TRANSLATORS: %s is type of the value (gid_t, uid_t,
-		       etc.) */
-		    _("Blanks in header where numeric %s value expected"),
-		    type));
+	    paxerror (0,
+		      /* TRANSLATORS: %s is type of the value (gid_t, uid_t,
+			 etc.) */
+		      _("Blanks in header where numeric %s value expected"),
+		      type);
 	  return -1;
 	}
       if (!c_isspace (*where))
@@ -810,10 +802,11 @@ from_header (char const *where0, size_t digs, char const *type,
 	  if (!overflow && value <= minus_minval)
 	    {
 	      if (!silent)
-		WARN ((0, 0,
-		       /* TRANSLATORS: Second %s is a type name (gid_t,uid_t,etc.) */
-		       _("Archive octal value %.*s is out of %s range; assuming two's complement"),
-		       (int) (where - where1), where1, type));
+		paxwarn (0,
+			 /* TRANSLATORS: Second %s is a type name (gid_t,uid_t,etc.) */
+			 _("Archive octal value %.*s is out of %s range;"
+			   " assuming two's complement"),
+			 (int) (where - where1), where1, type);
 	      negative = true;
 	    }
 	}
@@ -821,10 +814,10 @@ from_header (char const *where0, size_t digs, char const *type,
       if (overflow)
 	{
 	  if (type && !silent)
-	    ERROR ((0, 0,
-		    /* TRANSLATORS: Second %s is a type name (gid_t,uid_t,etc.) */
-		    _("Archive octal value %.*s is out of %s range"),
-		    (int) (where - where1), where1, type));
+	    paxerror (0,
+		      /* TRANSLATORS: Second %s is a type name (gid_t,uid_t,etc.) */
+		      _("Archive octal value %.*s is out of %s range"),
+		      (int) (where - where1), where1, type);
 	  return -1;
 	}
     }
@@ -837,29 +830,30 @@ from_header (char const *where0, size_t digs, char const *type,
       /* Parse base-64 output produced only by tar test versions
 	 1.13.6 (1999-08-11) through 1.13.11 (1999-08-23).
 	 Support for this will be withdrawn in future releases.  */
-      int dig;
       if (!silent)
 	{
 	  static bool warned_once;
 	  if (! warned_once)
 	    {
 	      warned_once = true;
-	      WARN ((0, 0, _("Archive contains obsolescent base-64 headers")));
+	      paxwarn (0, _("Archive contains obsolescent base-64 headers"));
 	    }
 	}
       negative = *where++ == '-';
-      while (where != lim
-	     && (dig = base64_map[(unsigned char) *where]) < 64)
+      while (where != lim)
 	{
+	  unsigned char uc = *where;
+	  char dig = base64_map[uc];
+	  if (dig <= 0)
+	    break;
 	  if (ckd_mul (&value, value, 64))
 	    {
 	      if (type && !silent)
-		ERROR ((0, 0,
-			_("Archive signed base-64 string %s is out of %s range"),
-			quote_mem (where0, digs), type));
+		paxerror (0, _("Archive signed base-64 string %s is out of %s range"),
+			  quote_mem (where0, digs), type);
 	      return -1;
 	    }
-	  value |= dig;
+	  value |= dig - 1;
 	  where++;
 	}
     }
@@ -879,15 +873,14 @@ from_header (char const *where0, size_t digs, char const *type,
       value = (*where++ & ((1 << (LG_256 - 2)) - 1)) - signbit;
       for (;;)
 	{
-	  value = (value << LG_256) + (unsigned char) *where++;
+	  unsigned char uc = *where++;
+	  value = (value << LG_256) + uc;
 	  if (where == lim)
 	    break;
 	  if (((value << LG_256 >> LG_256) | topbits) != value)
 	    {
 	      if (type && !silent)
-		ERROR ((0, 0,
-			_("Archive base-256 value is out of %s range"),
-			type));
+		paxerror (0, _("Archive base-256 value is out of %s range"), type);
 	      return -1;
 	    }
 	}
@@ -913,10 +906,10 @@ from_header (char const *where0, size_t digs, char const *type,
 	    lim--;
 	  quotearg_buffer (buf, sizeof buf, where0, lim - where0, o);
 	  if (!silent)
-	    ERROR ((0, 0,
-		    /* TRANSLATORS: Second %s is a type name (gid_t,uid_t,etc.) */
-		    _("Archive contains %.*s where numeric %s value expected"),
-		    (int) sizeof buf, buf, type));
+	    paxerror (0,
+		      /* TRANSLATORS: Second %s is a type name (gid_t,uid_t,etc.) */
+		      _("Archive contains %.*s where numeric %s value expected"),
+		      (int) sizeof buf, buf, type);
 	}
 
       return -1;
@@ -929,8 +922,8 @@ from_header (char const *where0, size_t digs, char const *type,
     {
       char const *value_sign = &"-"[!negative];
       /* TRANSLATORS: Second %s is type name (gid_t,uid_t,etc.) */
-      ERROR ((0, 0, _("Archive value %s%ju is out of %s range %jd..%ju"),
-	      value_sign, value, type, minval, maxval));
+      paxerror (0, _("Archive value %s%ju is out of %s range %jd..%ju"),
+		value_sign, value, type, minval, maxval);
     }
 
   return -1;
@@ -1154,7 +1147,7 @@ simple_print_header (struct tar_stat_info *st, union block *blk,
 	case GNUTYPE_LONGNAME:
 	case GNUTYPE_LONGLINK:
 	  modes[0] = 'L';
-	  ERROR ((0, 0, _("Unexpected long name header")));
+	  paxerror (0, _("Unexpected long name header"));
 	  break;
 
 	case GNUTYPE_SPARSE:
@@ -1391,7 +1384,7 @@ skim_file (off_t size, bool must_copy)
     {
       x = find_next_block ();
       if (! x)
-	FATAL_ERROR ((0, 0, _("Unexpected EOF in archive")));
+	paxfatal (0, _("Unexpected EOF in archive"));
 
       set_next_block_after (x);
       size -= BLOCKSIZE;
@@ -1431,7 +1424,6 @@ skim_member (bool must_copy)
 void
 test_archive_label (void)
 {
-  base64_init ();
   name_gather ();
 
   open_archive (ACCESS_READ);

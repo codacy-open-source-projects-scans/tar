@@ -76,20 +76,20 @@ report_difference (struct tar_stat_info *st, const char *fmt, ...)
 }
 
 /* Take a buffer returned by read_and_process and do nothing with it.  */
-static int
-process_noop (MAYBE_UNUSED size_t size, MAYBE_UNUSED char *data)
+static bool
+process_noop (MAYBE_UNUSED idx_t size, MAYBE_UNUSED char *data)
 {
-  return 1;
+  return true;
 }
 
-static int
-process_rawdata (size_t bytes, char *buffer)
+static bool
+process_rawdata (idx_t bytes, char *buffer)
 {
-  size_t status = blocking_read (diff_handle, diff_buffer, bytes);
+  ptrdiff_t status = blocking_read (diff_handle, diff_buffer, bytes);
 
   if (status != bytes)
     {
-      if (status == SAFE_READ_ERROR)
+      if (status < 0)
 	{
 	  read_error (current_stat_info.file_name);
 	  report_difference (&current_stat_info, NULL);
@@ -97,31 +97,31 @@ process_rawdata (size_t bytes, char *buffer)
       else
 	{
 	  report_difference (&current_stat_info,
-			     ngettext ("Could only read %lu of %lu byte",
-				       "Could only read %lu of %lu bytes",
+			     ngettext ("Could read only %td of %td byte",
+				       "Could read only %td of %td bytes",
 				       bytes),
-			     (unsigned long) status, (unsigned long) bytes);
+			     status, bytes);
 	}
-      return 0;
+      return false;
     }
 
   if (memcmp (buffer, diff_buffer, bytes))
     {
       report_difference (&current_stat_info, _("Contents differ"));
-      return 0;
+      return false;
     }
 
-  return 1;
+  return true;
 }
 
 /* Some other routine wants SIZE bytes in the archive.  For each chunk
    of the archive, call PROCESSOR with the size of the chunk, and the
-   address of the chunk it can work with.  The PROCESSOR should return
-   nonzero for success.  Once it returns error, continue skipping
-   without calling PROCESSOR anymore.  */
+   address of the chunk it can work with.  PROCESSOR should return
+   true for success.  Once it fails, continue skipping without calling
+   PROCESSOR anymore.  */
 
 static void
-read_and_process (struct tar_stat_info *st, int (*processor) (size_t, char *))
+read_and_process (struct tar_stat_info *st, bool (*processor) (idx_t, char *))
 {
   union block *data_block;
   size_t data_size;
@@ -133,7 +133,7 @@ read_and_process (struct tar_stat_info *st, int (*processor) (size_t, char *))
       data_block = find_next_block ();
       if (! data_block)
 	{
-	  ERROR ((0, 0, _("Unexpected EOF in archive")));
+	  paxerror (0, _("Unexpected EOF in archive"));
 	  return;
 	}
 
@@ -477,9 +477,9 @@ diff_archive (void)
   switch (current_header->header.typeflag)
     {
     default:
-      ERROR ((0, 0, _("%s: Unknown file type '%c', diffed as normal file"),
-	      quotearg_colon (current_stat_info.file_name),
-	      current_header->header.typeflag));
+      paxerror (0, _("%s: Unknown file type '%c', diffed as normal file"),
+		quotearg_colon (current_stat_info.file_name),
+		current_header->header.typeflag);
       FALLTHROUGH;
     case AREGTYPE:
     case REGTYPE:
@@ -529,19 +529,17 @@ verify_volume (void)
   int may_fail = 0;
   if (removed_prefixes_p ())
     {
-      WARN((0, 0,
-	    _("Archive contains file names with leading prefixes removed.")));
+      paxwarn (0,
+	       _("Archive contains file names with leading prefixes removed."));
       may_fail = 1;
     }
   if (transform_program_p ())
     {
-      WARN((0, 0,
-	    _("Archive contains transformed file names.")));
+      paxwarn (0, _("Archive contains transformed file names."));
       may_fail = 1;
     }
   if (may_fail)
-    WARN((0, 0,
-	  _("Verification may fail to locate original files.")));
+    paxwarn (0, _("Verification may fail to locate original files."));
 
   clear_directory_table ();
 
@@ -595,10 +593,11 @@ verify_volume (void)
 	    }
 	  while (status == HEADER_FAILURE);
 
-	  ERROR ((0, 0,
-		  ngettext ("VERIFY FAILURE: %d invalid header detected",
-			    "VERIFY FAILURE: %d invalid headers detected",
-			    counter), counter));
+	  paxerror (0,
+		    ngettext ("VERIFY FAILURE: %d invalid header detected",
+			      "VERIFY FAILURE: %d invalid headers detected",
+			      counter),
+		    counter);
 	}
       if (status == HEADER_END_OF_FILE)
 	break;
@@ -611,9 +610,9 @@ verify_volume (void)
 	                            read_header_auto);
 	      if (status == HEADER_ZERO_BLOCK)
 	        break;
-	      WARNOPT (WARN_ALONE_ZERO_BLOCK,
-		       (0, 0, _("A lone zero block at %jd"),
-			intmax (current_block_ordinal ())));
+	      warnopt (WARN_ALONE_ZERO_BLOCK,
+		       0, _("A lone zero block at %jd"),
+		       intmax (current_block_ordinal ()));
             }
 	  continue;
 	}

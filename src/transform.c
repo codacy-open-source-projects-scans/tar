@@ -62,7 +62,7 @@ struct transform
   struct transform *next;
   enum transform_type transform_type;
   int flags;
-  unsigned match_number;
+  idx_t match_number;
   regex_t regex;
   /* Compiled replacement expression */
   struct replace_segm *repl_head, *repl_tail;
@@ -200,17 +200,16 @@ parse_transform_expr (const char *expr)
 		  break;
 		}
 	      if (parse_xform_flags (&transform_flags, *expr))
-		USAGE_ERROR ((0, 0, _("Unknown transform flag: %c"),
-			      *expr));
+		paxusage (_("Unknown transform flag: %c"), *expr);
 	    }
 	  return expr;
 	}
-      USAGE_ERROR ((0, 0, _("Invalid transform expression")));
+      paxusage (_("Invalid transform expression"));
     }
 
   delim = expr[1];
   if (!delim)
-    USAGE_ERROR ((0, 0, _("Invalid transform expression")));
+    paxusage (_("Invalid transform expression"));
 
   /* Scan regular expression */
   for (i = 2; expr[i] && expr[i] != delim; i++)
@@ -218,7 +217,7 @@ parse_transform_expr (const char *expr)
       i++;
 
   if (expr[i] != delim)
-    USAGE_ERROR ((0, 0, _("Invalid transform expression")));
+    paxusage (_("Invalid transform expression"));
 
   /* Scan replacement expression */
   for (j = i + 1; expr[j] && expr[j] != delim; j++)
@@ -226,7 +225,7 @@ parse_transform_expr (const char *expr)
       j++;
 
   if (expr[j] != delim)
-    USAGE_ERROR ((0, 0, _("Invalid transform expression")));
+    paxusage (_("Invalid transform expression"));
 
   /* Check flags */
   tf->transform_type = transform_first;
@@ -248,14 +247,16 @@ parse_transform_expr (const char *expr)
 
       case '0': case '1': case '2': case '3': case '4':
       case '5': case '6': case '7': case '8': case '9':
-	tf->match_number = strtoul (p, (char**) &p, 0);
-	p--;
+	{
+	  char *endp;
+	  tf->match_number = stoint (p, &endp, NULL, 0, IDX_MAX);
+	  p = endp - 1;
+	}
 	break;
 
       default:
 	if (parse_xform_flags (&tf->flags, *p))
-	  USAGE_ERROR ((0, 0, _("Unknown flag in transform expression: %c"),
-			*p));
+	  paxusage (_("Unknown flag in transform expression: %c"), *p);
       }
 
   if (*p == ';')
@@ -272,7 +273,7 @@ parse_transform_expr (const char *expr)
     {
       char errbuf[512];
       regerror (rc, &tf->regex, errbuf, sizeof (errbuf));
-      USAGE_ERROR ((0, 0, _("Invalid transform expression: %s"), errbuf));
+      paxusage (_("Invalid transform expression: %s"), errbuf);
     }
 
   if (str[0] == '^' || (i > 2 && str[i - 3] == '$'))
@@ -290,17 +291,18 @@ parse_transform_expr (const char *expr)
     {
       if (*cur == '\\')
 	{
-	  size_t n;
-
 	  add_literal_segment (tf, beg, cur);
 	  switch (*++cur)
 	    {
 	    case '0': case '1': case '2': case '3': case '4':
 	    case '5': case '6': case '7': case '8': case '9':
-	      n = strtoul (cur, &cur, 10);
-	      if (n > tf->regex.re_nsub)
-		USAGE_ERROR ((0, 0, _("Invalid transform replacement: back reference out of range")));
-	      add_backref_segment (tf, n);
+	      {
+		idx_t n = stoint (cur, &cur, NULL, 0, IDX_MAX);
+		if (tf->regex.re_nsub < n)
+		  paxusage (_("Invalid transform replacement:"
+			      " back reference out of range"));
+		add_backref_segment (tf, n);
+	      }
 	      break;
 
 	    case '\\':
@@ -462,15 +464,6 @@ _single_transform_name_to_obstack (struct transform *tf, char *input)
   size_t nmatches = 0;
   enum case_ctl_type case_ctl = ctl_stop,  /* Current case conversion op */
                      save_ctl = ctl_stop;  /* Saved case_ctl for \u and \l */
-
-  /* Reset case conversion after a single-char operation */
-#define CASE_CTL_RESET()  if (case_ctl == ctl_upcase_next     \
-			      || case_ctl == ctl_locase_next) \
-                            {                                 \
-                              case_ctl = save_ctl;            \
-                              save_ctl = ctl_stop;            \
-			    }
-
   regmatch_t *rmp = xinmalloc (tf->regex.re_nsub + 1, sizeof *rmp);
 
   while (*input)
@@ -504,7 +497,14 @@ _single_transform_name_to_obstack (struct transform *tf, char *input)
 		  run_case_conv (case_ctl,
 				 segm->v.literal.ptr,
 				 segm->v.literal.size);
-		  CASE_CTL_RESET ();
+		case_ctl_reset:
+		  /* Reset case conversion after a single-char operation.  */
+		  if (case_ctl == ctl_upcase_next
+		      || case_ctl == ctl_locase_next)
+		    {
+		      case_ctl = save_ctl;
+		      save_ctl = ctl_stop;
+		    }
 		  break;
 
 		case segm_backref:    /* Back-reference segment */
@@ -515,7 +515,7 @@ _single_transform_name_to_obstack (struct transform *tf, char *input)
 			              - rmp[segm->v.ref].rm_so;
 		      run_case_conv (case_ctl,
 				     input + rmp[segm->v.ref].rm_so, size);
-		      CASE_CTL_RESET ();
+		      goto case_ctl_reset;
 		    }
 		  break;
 

@@ -50,7 +50,7 @@ struct checkpoint_action
 };
 
 /* Checkpointing counter */
-static unsigned checkpoint;
+static intmax_t checkpoint;
 
 /* List of checkpoint actions */
 static struct checkpoint_action *checkpoint_action, *checkpoint_action_tail;
@@ -127,12 +127,12 @@ checkpoint_compile_action (const char *str)
     }
   else if (strncmp (str, "sleep=", 6) == 0)
     {
+      char const *arg = str + 6;
       char *p;
-      time_t n = strtoul (str+6, &p, 10);
-      if (*p)
-	FATAL_ERROR ((0, 0, _("%s: not a valid timeout"), str));
       act = alloc_action (cop_sleep);
-      act->v.time = n;
+      act->v.time = stoint (arg, &p, NULL, 0, TYPE_MAXIMUM (time_t));
+      if ((p == arg) | *p)
+	paxfatal (0, _("%s: not a valid timeout"), str);
     }
   else if (strcmp (str, "totals") == 0)
     alloc_action (cop_totals);
@@ -143,7 +143,7 @@ checkpoint_compile_action (const char *str)
       sigaddset (&sigs, act->v.signal);
     }
   else
-    FATAL_ERROR ((0, 0, _("%s: unknown checkpoint action"), str));
+    paxfatal (0, _("%s: unknown checkpoint action"), str);
 }
 
 void
@@ -175,7 +175,7 @@ static const char *checkpoint_total_format[] = {
   "D"
 };
 
-static long
+static intmax_t
 getwidth (FILE *fp)
 {
   char const *columns;
@@ -189,8 +189,9 @@ getwidth (FILE *fp)
   columns = getenv ("COLUMNS");
   if (columns)
     {
-      long int col = strtol (columns, NULL, 10);
-      if (0 < col)
+      char *end;
+      intmax_t col = stoint (columns, &end, NULL, 0, INTMAX_MAX);
+      if (! (*end | !col))
 	return col;
     }
 
@@ -231,7 +232,7 @@ static const char *def_format =
 static int
 format_checkpoint_string (FILE *fp, size_t len,
 			  const char *input, bool do_write,
-			  unsigned cpn)
+			  intmax_t cpn)
 {
   const char *opstr = do_write ? gettext ("write") : gettext ("read");
   const char *ip;
@@ -279,7 +280,7 @@ format_checkpoint_string (FILE *fp, size_t len,
 	      break;
 
 	    case 'u':
-	      len += fprintf (fp, "%u", cpn);
+	      len += fprintf (fp, "%jd", cpn);
 	      break;
 
 	    case 's':
@@ -303,10 +304,10 @@ format_checkpoint_string (FILE *fp, size_t len,
 		    if (wordsplit (arg, &ws,
 				   (WRDSF_NOVAR | WRDSF_NOCMD
 				    | WRDSF_QUOTE | WRDSF_DELIM)))
-		      ERROR ((0, 0, _("cannot split string '%s': %s"),
-			      arg, wordsplit_strerror (&ws)));
+		      paxerror (0, _("cannot split string '%s': %s"),
+				arg, wordsplit_strerror (&ws));
 		    else if (3 < ws.ws_wordc)
-		      ERROR ((0, 0, _("too many words in '%s'"), arg));
+		      paxerror (0, _("too many words in '%s'"), arg);
 		    else
 		      {
 			int i;
@@ -336,7 +337,16 @@ format_checkpoint_string (FILE *fp, size_t len,
 
 	    case '*':
 	      {
-		long w = arg ? strtol (arg, NULL, 10) : getwidth (fp);
+		intmax_t w;
+		if (!arg)
+		  w = getwidth (fp);
+		else
+		  {
+		    char *end;
+		    w = stoint (arg, &end, NULL, 0, INTMAX_MAX);
+		    if ((end == arg) | *end)
+		      w = 80;
+		  }
 		for (; w > len; len++)
 		  fputc (' ', fp);
 	      }

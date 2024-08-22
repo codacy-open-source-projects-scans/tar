@@ -23,7 +23,7 @@
 #include <rmt.h>
 
 static union block *new_record;
-static int new_blocks;
+static idx_t new_blocks;
 static bool acting_as_filter;
 
 /* The number of records skipped at the start of the archive, when
@@ -57,7 +57,7 @@ move_archive (off_t count)
 	  || ckd_add (&position, move_start, increment)
 	  || position < 0)
 	{
-	  ERROR ((0, EOVERFLOW, "lseek: %s", archive_name_array[0]));
+	  paxerror (EOVERFLOW, "lseek: %s", archive_name_array[0]);
 	  return;
 	}
       else if (rmtlseek (archive, position, SEEK_SET) == position)
@@ -179,7 +179,7 @@ delete_archive_members (void)
 	      break;
 	    }
 	  name->found_count++;
-	  if (!ISFOUND (name))
+	  if (!isfound (name))
 	    {
 	      skim_member (acting_as_filter);
 	      break;
@@ -205,12 +205,12 @@ delete_archive_members (void)
 	  switch (previous_status)
 	    {
 	    case HEADER_STILL_UNREAD:
-	      WARN ((0, 0, _("This does not look like a tar archive")));
+	      paxwarn (0, _("This does not look like a tar archive"));
 	      FALLTHROUGH;
 	    case HEADER_SUCCESS:
 	    case HEADER_SUCCESS_EXTENDED:
 	    case HEADER_ZERO_BLOCK:
-	      ERROR ((0, 0, _("Skipping to next header")));
+	      paxerror (0, _("Skipping to next header"));
 	      FALLTHROUGH;
 	    case HEADER_FAILURE:
 	      break;
@@ -271,7 +271,7 @@ delete_archive_members (void)
 	      if ((name = name_scan (current_stat_info.file_name, false)) != NULL)
 		{
 		  name->found_count++;
-		  if (ISFOUND (name))
+		  if (isfound (name))
 		    {
 		      flush_file ();
 		      break;
@@ -348,7 +348,7 @@ delete_archive_members (void)
 	      break;
 
 	    case HEADER_FAILURE:
-	      ERROR ((0, 0, _("Deleting non-header from archive")));
+	      paxerror (0, _("Deleting non-header from archive"));
 	      set_next_block_after (current_header);
 	      break;
 
@@ -363,11 +363,11 @@ delete_archive_members (void)
 	  /* Write the end of tape.  FIXME: we can't use write_eot here,
 	     as it gets confused when the input is at end of file.  */
 
-	  int total_zero_blocks = 0;
+	  idx_t total_zero_blocks = 0;
 
 	  do
 	    {
-	      int zero_blocks = blocking_factor - new_blocks;
+	      idx_t zero_blocks = blocking_factor - new_blocks;
 	      memset (new_record + new_blocks, 0, BLOCKSIZE * zero_blocks);
 	      total_zero_blocks += zero_blocks;
 	      write_record (total_zero_blocks < 2);

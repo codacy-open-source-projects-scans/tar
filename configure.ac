@@ -82,12 +82,16 @@ AC_TYPE_MODE_T
 AC_TYPE_PID_T
 AC_TYPE_OFF_T
 AC_TYPE_UID_T
-AC_CHECK_TYPE(major_t, , AC_DEFINE(major_t, int,
-				   [Type of major device numbers.]))
-AC_CHECK_TYPE(minor_t, , AC_DEFINE(minor_t, int,
-				   [Type of minor device numbers.]))
-AC_CHECK_TYPE(dev_t, unsigned)
-AC_CHECK_TYPE(ino_t, unsigned)
+
+# Taken from GNU/Linux, and should be good enough on platforms
+# lacking these types.
+AC_CHECK_TYPE([dev_t], [unsigned long long int])
+AC_CHECK_TYPE([ino_t], [unsigned long long int])
+
+# Taken from GNU/Linux, and should be good enough on platforms
+# lacking these types.
+AC_CHECK_TYPE([major_t], [unsigned int])
+AC_CHECK_TYPE([minor_t], [unsigned int])
 
 gt_TYPE_SSIZE_T
 
@@ -108,9 +112,8 @@ AC_DEFINE([GNULIB_WCHAR_SINGLE_LOCALE], [1],
    like mbrtowc only after setting the locale, and never change the
    locale once set.])
 
-if test $ac_cv_lib_error_at_line = no; then
-  # This means that the error() function is not present in libc, so
-  # the one from gnulib will be used instead. This function precedes
+if test $COMPILE_ERROR_C = 1; then
+  # This means that Gnulib's 'error' function will be used.  It precedes
   # error messages it prints with the program name as returned by getprogname()
   # call, instead of using the name set by set_program_name.
   # Install workaround.

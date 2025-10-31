@@ -1,0 +1,6 @@
+[submodule "gnulib"]
+	path = gnulib
+	url = https://git.savannah.gnu.org/git/gnulib.git
+[submodule "paxutils"]
+	path = paxutils
+	url = https://git.savannah.gnu.org/git/paxutils.git

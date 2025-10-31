@@ -1,0 +1,47 @@
+# Test suite for GNU tar.                             -*- Autotest -*-
+# Copyright 2020-2025 Free Software Foundation, Inc.
+#
+# This file is part of GNU tar.
+#
+# GNU tar is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# GNU tar is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+AT_SETUP([--no-overwrite-dir on unwritable directory])
+AT_KEYWORDS([extract extrac30 no-overwrite-dir])
+
+# Make sure that tar does not change permissions on directories if
+# --no-overwrite-dir tells it not to, not even temporarily.
+
+AT_TAR_CHECK([
+AT_UNPRIVILEGED_PREREQ
+
+# Test that the user cannot write to a unwritable directory
+# if --no-overwrite-dir is used.
+mkdir dir
+chmod 755 dir
+genfile --file dir/file
+tar cf a.tar dir
+rm dir/file
+chmod 555 dir
+tar -xf a.tar --no-overwrite-dir
+genfile --stat=mode.777 dir
+chmod 755 dir
+find dir
+],
+[0],
+[555
+dir
+],
+[tar: dir/file: Cannot open: Permission denied
+tar: Exiting with failure status due to previous errors
+])
+AT_CLEANUP

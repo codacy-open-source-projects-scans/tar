@@ -1,7 +1,7 @@
 /* Prototypes for openat-style fd-relative functions for operating with
    extended file attributes.
 
-   Copyright 2012-2024 Free Software Foundation, Inc.
+   Copyright 2012-2025 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -51,7 +51,7 @@ int lsetxattrat (int dir_fd, const char *path, const char *name,
                  const void *value, size_t size, int flags);
 
 /* dir-fd-relative getxattr.  Operation gets the VALUE of the extended
-   attribute idenfified by NAME and associated with the given PATH in the
+   attribute identified by NAME and associated with the given PATH in the
    filesystem relatively to directory identified by DIR_FD.  For more info
    about all parameters see the getxattr(2) manpage. */
 ssize_t getxattrat (int dir_fd, const char *path, const char *name,

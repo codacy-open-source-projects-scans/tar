@@ -45,7 +45,7 @@ format.
 
 * pax-big-10g.at
 
-Requires pax-big-10g.tar.bz2. It tests handling pax (POSIX.1-2001) archves
+Requires pax-big-10g.tar.bz2. It tests handling pax (POSIX.1-2001) archives
 containing very large files (in this case -- 10 GB).
 
 * quicktest.sh
@@ -67,7 +67,7 @@ the example below:
 
 * Copying
 
-Copyright 2004-2024 Free Software Foundation, Inc.
+Copyright 2004-2025 Free Software Foundation, Inc.
 
 This file is part of GNU tar.
 

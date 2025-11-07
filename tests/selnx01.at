@@ -1,7 +1,7 @@
 # Process this file with autom4te to create testsuite. -*- Autotest -*-
 #
 # Test suite for GNU tar.
-# Copyright 2012-2024 Free Software Foundation, Inc.
+# Copyright 2012-2025 Free Software Foundation, Inc.
 
 # This file is part of GNU tar.
 
@@ -35,7 +35,7 @@ ln -s file dir/link
 
 getfattr -h -d -msecurity.selinux dir dir/file dir/link > start
 
-restorecon -R dir
+restorecon -R dir >/dev/null
 chcon -h --user=system_u     dir
 chcon -h --user=unconfined_u dir/file
 chcon -h --user=system_u     dir/link

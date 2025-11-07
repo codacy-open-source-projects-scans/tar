@@ -1,6 +1,6 @@
 /* Charset handling for GNU tar.
 
-   Copyright 2004-2024 Free Software Foundation, Inc.
+   Copyright 2004-2025 Free Software Foundation, Inc.
 
    This file is part of GNU tar.
 
@@ -54,14 +54,14 @@ static iconv_t conv_desc[2] = { (iconv_t) -1, (iconv_t) -1 };
 static iconv_t
 utf8_init (bool to_utf)
 {
-  if (conv_desc[(int) to_utf] == (iconv_t) -1)
+  if (conv_desc[to_utf] == (iconv_t) -1)
     {
       if (to_utf)
-	conv_desc[(int) to_utf] = iconv_open ("UTF-8", locale_charset ());
+	conv_desc[to_utf] = iconv_open ("UTF-8", locale_charset ());
       else
-	conv_desc[(int) to_utf] = iconv_open (locale_charset (), "UTF-8");
+	conv_desc[to_utf] = iconv_open (locale_charset (), "UTF-8");
     }
-  return conv_desc[(int) to_utf];
+  return conv_desc[to_utf];
 }
 
 bool

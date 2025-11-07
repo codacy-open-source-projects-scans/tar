@@ -1,6 +1,6 @@
 # Makefile for GNU tar regression tests.
 
-# Copyright 1996-2024 Free Software Foundation, Inc.
+# Copyright 1996-2025 Free Software Foundation, Inc.
 
 # This file is part of GNU tar.
 
@@ -137,6 +137,9 @@ TESTSUITE_AT = \
  extrac25.at\
  extrac26.at\
  extrac27.at\
+ extrac28.at\
+ extrac29.at\
+ extrac30.at\
  filerem01.at\
  filerem02.at\
  grow.at\
@@ -244,6 +247,7 @@ TESTSUITE_AT = \
  shortrec.at\
  shortupd.at\
  sigpipe.at\
+ skipdir.at\
  sparse01.at\
  sparse02.at\
  sparse03.at\
@@ -340,7 +344,7 @@ AM_CPPFLAGS = \
  -DLOCALEDIR=\"$(localedir)\"
 
 LDADD = ../gnu/libgnu.a\
- $(LIB_ACL) $(LIB_CLOCK_GETTIME) $(LIB_EACCESS)\
- $(LIB_GETRANDOM) $(LIB_HARD_LOCALE) $(FILE_HAS_ACL_LIB) $(LIB_MBRTOWC)\
- $(LIB_SELINUX) $(LIB_SETLOCALE_NULL) \
+ $(LIB_ACL) $(QCOPY_ACL_LIB) $(CLOCK_TIME_LIB) $(EUIDACCESS_LIBGEN)\
+ $(GETRANDOM_LIB) $(HARD_LOCALE_LIB) $(FILE_HAS_ACL_LIB) $(MBRTOWC_LIB)\
+ $(LIB_SELINUX) $(SETLOCALE_NULL_LIB) \
  $(LIBINTL) $(LIBICONV)

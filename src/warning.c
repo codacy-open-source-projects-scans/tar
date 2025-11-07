@@ -1,6 +1,6 @@
 /* Warnings for GNU tar.
 
-   Copyright 2009-2024 Free Software Foundation, Inc.
+   Copyright 2009-2025 Free Software Foundation, Inc.
 
    This file is part of GNU tar.
 
@@ -50,6 +50,7 @@ static char const *const warning_args[] = {
   "failed-read",
   "missing-zero-blocks",
   "verbose",
+  "empty-transform",
   NULL
 };
 
@@ -81,6 +82,7 @@ static int warning_types[] = {
   WARN_FAILED_READ,
   WARN_MISSING_ZERO_BLOCKS,
   WARN_VERBOSE_WARNINGS,
+  WARN_EMPTY_TRANSFORM
 };
 
 ARGMATCH_VERIFY (warning_args, warning_types);
@@ -90,7 +92,7 @@ int warning_option = WARN_ALL & ~(WARN_VERBOSE_WARNINGS|WARN_MISSING_ZERO_BLOCKS
 void
 set_warning_option (const char *arg)
 {
-  int negate = 0;
+  bool negate = false;
   int option;
 
   if (strcmp (arg, "none") == 0)
@@ -100,7 +102,7 @@ set_warning_option (const char *arg)
     }
   if (strlen (arg) > 2 && memcmp (arg, "no-", 3) == 0)
     {
-      negate = 1;
+      negate = true;
       arg += 3;
     }
 

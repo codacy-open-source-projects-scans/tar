@@ -1,5 +1,5 @@
 /* This file is part of GNU tar.
-   Copyright 2006-2024 Free Software Foundation, Inc.
+   Copyright 2006-2025 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify it
    under the terms of the GNU General Public License as published by the
@@ -17,6 +17,7 @@
 #include <system.h>
 #include <regex.h>
 #include <mcel.h>
+#include <quotearg.h>
 #include "common.h"
 
 enum transform_type
@@ -50,9 +51,9 @@ struct replace_segm
     struct
     {
       char *ptr;
-      size_t size;
+      idx_t size;
     } literal;                /* type == segm_literal */
-    size_t ref;               /* type == segm_backref */
+    idx_t ref;		      /* type == segm_backref */
     enum case_ctl_type ctl;   /* type == segm_case_ctl */
   } v;
 };
@@ -66,7 +67,7 @@ struct transform
   regex_t regex;
   /* Compiled replacement expression */
   struct replace_segm *repl_head, *repl_tail;
-  size_t segm_count; /* Number of elements in the above list */
+  idx_t segm_count; /* Number of elements in the above list */
 };
 
 
@@ -103,7 +104,7 @@ add_segment (struct transform *tf)
 static void
 add_literal_segment (struct transform *tf, const char *str, const char *end)
 {
-  size_t len = end - str;
+  idx_t len = end - str;
   if (len)
     {
       struct replace_segm *segm = add_segment (tf);
@@ -116,7 +117,7 @@ add_literal_segment (struct transform *tf, const char *str, const char *end)
 }
 
 static void
-add_char_segment (struct transform *tf, int chr)
+add_char_segment (struct transform *tf, char chr)
 {
   struct replace_segm *segm = add_segment (tf);
   segm->type = segm_literal;
@@ -127,15 +128,15 @@ add_char_segment (struct transform *tf, int chr)
 }
 
 static void
-add_backref_segment (struct transform *tf, size_t ref)
+add_backref_segment (struct transform *tf, idx_t ref)
 {
   struct replace_segm *segm = add_segment (tf);
   segm->type = segm_backref;
   segm->v.ref = ref;
 }
 
-static int
-parse_xform_flags (int *pflags, int c)
+static bool
+parse_xform_flags (int *pflags, char c)
 {
   switch (c)
     {
@@ -164,9 +165,9 @@ parse_xform_flags (int *pflags, int c)
       break;
 
     default:
-      return 1;
+      return false;
     }
-  return 0;
+  return true;
 }
 
 static void
@@ -180,8 +181,7 @@ add_case_ctl_segment (struct transform *tf, enum case_ctl_type ctl)
 static const char *
 parse_transform_expr (const char *expr)
 {
-  int delim;
-  int i, j, rc;
+  idx_t i, j;
   char *str, *beg, *cur;
   const char *p;
   int cflags = 0;
@@ -199,7 +199,7 @@ parse_transform_expr (const char *expr)
 		  expr++;
 		  break;
 		}
-	      if (parse_xform_flags (&transform_flags, *expr))
+	      if (!parse_xform_flags (&transform_flags, *expr))
 		paxusage (_("Unknown transform flag: %c"), *expr);
 	    }
 	  return expr;
@@ -207,7 +207,7 @@ parse_transform_expr (const char *expr)
       paxusage (_("Invalid transform expression"));
     }
 
-  delim = expr[1];
+  char delim = expr[1];
   if (!delim)
     paxusage (_("Invalid transform expression"));
 
@@ -255,7 +255,7 @@ parse_transform_expr (const char *expr)
 	break;
 
       default:
-	if (parse_xform_flags (&tf->flags, *p))
+	if (!parse_xform_flags (&tf->flags, *p))
 	  paxusage (_("Unknown flag in transform expression: %c"), *p);
       }
 
@@ -267,7 +267,7 @@ parse_transform_expr (const char *expr)
   memcpy (str, expr + 2, i - 2);
   str[i - 2] = 0;
 
-  rc = regcomp (&tf->regex, str, cflags);
+  int rc = regcomp (&tf->regex, str, cflags);
 
   if (rc)
     {
@@ -426,7 +426,7 @@ static bool stk_init;
 /* Run case conversion specified by CASE_CTL on array PTR of SIZE
    characters.  Append the result to STK.  */
 static void
-run_case_conv (enum case_ctl_type case_ctl, char *ptr, size_t size)
+run_case_conv (enum case_ctl_type case_ctl, char *ptr, idx_t size)
 {
   char const *p = ptr, *plim = ptr + size;
   mbstate_t mbs; mbszero (&mbs);
@@ -446,7 +446,7 @@ run_case_conv (enum case_ctl_type case_ctl, char *ptr, size_t size)
 	{
 	  obstack_make_room (&stk, MB_LEN_MAX);
 	  mbstate_t ombs; mbszero (&ombs);
-	  size_t outbytes = c32rtomb (obstack_next_free (&stk), ch, &ombs);
+	  idx_t outbytes = c32rtomb (obstack_next_free (&stk), ch, &ombs);
 	  obstack_blank_fast (&stk, outbytes);
 	}
       p += g.len;
@@ -461,14 +461,14 @@ static void
 _single_transform_name_to_obstack (struct transform *tf, char *input)
 {
   int rc;
-  size_t nmatches = 0;
+  idx_t nmatches = 0;
   enum case_ctl_type case_ctl = ctl_stop,  /* Current case conversion op */
                      save_ctl = ctl_stop;  /* Saved case_ctl for \u and \l */
   regmatch_t *rmp = xinmalloc (tf->regex.re_nsub + 1, sizeof *rmp);
 
   while (*input)
     {
-      size_t disp;
+      idx_t disp;
 
       rc = regexec (&tf->regex, input, tf->regex.re_nsub + 1, rmp, 0);
 
@@ -511,8 +511,8 @@ _single_transform_name_to_obstack (struct transform *tf, char *input)
 		  if (0 <= rmp[segm->v.ref].rm_so
 		      && 0 <= rmp[segm->v.ref].rm_eo)
 		    {
-		      size_t size = rmp[segm->v.ref].rm_eo
-			              - rmp[segm->v.ref].rm_so;
+		      idx_t size = (rmp[segm->v.ref].rm_eo
+				    - rmp[segm->v.ref].rm_so);
 		      run_case_conv (case_ctl,
 				     input + rmp[segm->v.ref].rm_so, size);
 		      goto case_ctl_reset;
@@ -562,11 +562,11 @@ _single_transform_name_to_obstack (struct transform *tf, char *input)
   free (rmp);
 }
 
-static bool
+static void
 _transform_name_to_obstack (int flags, char *input, char **output)
 {
   struct transform *tf;
-  bool alloced = false;
+  bool ok = false;
 
   if (!stk_init)
     {
@@ -580,38 +580,53 @@ _transform_name_to_obstack (int flags, char *input, char **output)
 	{
 	  _single_transform_name_to_obstack (tf, input);
 	  input = obstack_finish (&stk);
-	  alloced = true;
+	  ok = true;
 	}
     }
+  if (!ok)
+    {
+      obstack_grow0 (&stk, input, strlen (input));
+      input = obstack_finish (&stk);
+    }
   *output = input;
-  return alloced;
 }
 
+/* Transform name *PINPUT of a file or archive member of type TYPE
+   (a single XFORM_* bit).  If FUN is not NULL, call this function
+   to further transform the result.  Arguments to FUN are the transformed
+   name and type, it's return value is the new transformed name.
+
+   If transformation results in a non-empty string, store the result in
+   *PINPUT and return true.  Otherwise, if it results in an empty string,
+   issue a warning, return false and don't modify PINPUT.
+ */
 bool
-transform_name_fp (char **pinput, int flags,
-		   char *(*fun)(char *, void *), void *dat)
+transform_name_fp (char **pinput, int type,
+		   char const *(*fun) (char const *, int))
 {
-    char *str;
-    bool ret = _transform_name_to_obstack (flags, *pinput, &str);
-    if (ret)
-      {
-	assign_string (pinput, fun ? fun (str, dat) : str);
-	obstack_free (&stk, str);
-      }
-    else if (fun)
-      {
-	*pinput = NULL;
-	assign_string (pinput, fun (str, dat));
-	free (str);
-	ret = true;
-      }
-    return ret;
+  char *str;
+  char const *result;
+
+  _transform_name_to_obstack (type, *pinput, &str);
+  result = (str[0] != 0 && fun) ? fun (str, type) : str;
+
+  if (result[0] == 0)
+    {
+      warnopt (WARN_EMPTY_TRANSFORM, 0,
+	       _("%s: transforms to empty name"), quotearg_colon (*pinput));
+      obstack_free (&stk, str);
+      return false;
+    }
+
+  assign_string (pinput, result);
+  obstack_free (&stk, str);
+  return true;
 }
 
 bool
 transform_name (char **pinput, int type)
 {
-  return transform_name_fp (pinput, type, NULL, NULL);
+  return transform_name_fp (pinput, type, NULL);
 }
 
 bool

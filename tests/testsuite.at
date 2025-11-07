@@ -1,7 +1,7 @@
 # Process this file with autom4te to create testsuite. -*- Autotest -*-
 
 # Test suite for GNU tar.
-# Copyright 2004-2024 Free Software Foundation, Inc.
+# Copyright 2004-2025 Free Software Foundation, Inc.
 
 # This file is part of GNU tar.
 
@@ -94,7 +94,7 @@ m4_define([AT_SORT_PREREQ],[
 test -z "`sort < /dev/null 2>&1`" || AT_SKIP_TEST
 ])
 
-dnl AT_UNPRIVILEGED_PREREQ - Skip test if running at root privileges
+dnl AT_UNPRIVILEGED_PREREQ - Skip test if running with root privileges
 m4_define([AT_UNPRIVILEGED_PREREQ],[
 echo "test" > $[]$
 chmod 0 $[]$
@@ -354,6 +354,9 @@ m4_include([extrac24.at])
 m4_include([extrac25.at])
 m4_include([extrac26.at])
 m4_include([extrac27.at])
+m4_include([extrac28.at])
+m4_include([extrac29.at])
+m4_include([extrac30.at])
 
 m4_include([backup01.at])
 
@@ -469,7 +472,7 @@ AT_BANNER([Volume operations])
 m4_include([volume.at])
 m4_include([volsize.at])
 
-AT_BANNER()
+AT_BANNER([Various tests])
 m4_include([comprec.at])
 m4_include([shortfile.at])
 m4_include([shortupd.at])
@@ -478,6 +481,7 @@ m4_include([truncate.at])
 m4_include([grow.at])
 m4_include([sigpipe.at])
 m4_include([comperr.at])
+m4_include([skipdir.at])
 
 AT_BANNER([Removing files after archiving])
 m4_include([remfiles01.at])

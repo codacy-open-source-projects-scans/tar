@@ -1,7 +1,7 @@
-GNU tar NEWS - User visible changes. 2023-09-12
+GNU tar NEWS - User visible changes. 2025-10-19
 Please send GNU tar bug reports to <bug-tar@gnu.org>
 
-version TBD
+version 1.35.90 (git)
 
 * New manual section "Reproducibility", for reproducible tarballs.
 
@@ -24,6 +24,15 @@ as argument to --mtime option (see GNU tar manual, chapter 4
 Defines output format for the COMMAND set by the above option.  If
 used, command output will be parsed using strptime(3).
 
+* Skip file or archive member if transformed name is empty
+
+If applying file name transformations (--transform and
+--strip-component options) to a file or member name results in an
+empty string that file or member is skipped and a warning is printed.
+
+The warning can be suppressed using the --warning=empty-transform
+option.
+
 * Bug fixes
 
 ** Fixed O(n^2) time complexity bug for large numbers of directories when
@@ -35,6 +44,17 @@ used, command output will be parsed using strptime(3).
 
 ** Transformations that change case (e.g., --transform='s/.*/\L&/')
    now work correctly with multi-byte characters.
+
+** --no-overwrite-dir no longer changes permissions of existing directories,
+   not even temporarily.  This matches the documentation better and avoids
+   some permissions glitches.
+
+** tar now works better in strict debugging environments that do not
+   allow pointer arithmetic to escape from a sub-element of an array.
+
+* Performance improvements
+
+** Sparse files are now read and written with larger blocksizes.
 
 
 version 1.35 - Sergey Poznyakoff, 2023-07-18
@@ -1822,7 +1842,7 @@ Versions 1.07 back to 1.00 by Jay Fenlason.
 
 
 
-Copyright 1994-2024 Free Software Foundation, Inc.
+Copyright 1994-2025 Free Software Foundation, Inc.
 
 This file is part of GNU tar.
 

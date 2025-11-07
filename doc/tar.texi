@@ -47,7 +47,7 @@ This manual is for @acronym{GNU} @command{tar} (version
 from archives.
 
 Copyright @copyright{} 1992, 1994--1997, 1999--2001, 2003--2017,
-2021--2024 Free Software Foundation, Inc.
+2021--2025 Free Software Foundation, Inc.
 
 @quotation
 Permission is granted to copy, distribute and/or modify this document
@@ -4028,7 +4028,7 @@ successfully.  For example, @w{@samp{tar --version}} might print:
 
 @smallexample
 tar (GNU tar) @value{VERSION}
-Copyright (C) 2024 Free Software Foundation, Inc.
+Copyright (C) 2025 Free Software Foundation, Inc.
 License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>.
 This is free software: you are free to change and redistribute it.
 There is NO WARRANTY, to the extent permitted by law.
@@ -4639,7 +4639,7 @@ The subsections below discuss allowed values for @var{keyword} along with the
 warning messages they control.
 
 @menu
-* General Warnings::  Keywords applicable for @command{tar --create}.
+* General Warnings::  Keywords controlling @command{tar} operation.
 * Archive Creation Warnings:: Keywords applicable for @command{tar --create}.
 * Archive Extraction Warnings:: Keywords applicable for @command{tar --extract}.
 * Incremental Extraction Warnings:: Keywords controlling incremental extraction.
@@ -4668,6 +4668,11 @@ operation mode:
 @samp{A lone zero block at %s}.  Notice, that this warning is
 suppressed if @option{--ignore-zeros} is in effect (@pxref{Ignore
 Zeros}).
+@end defvr
+
+@defvr {warning} empty-transform
+@cindex @samp{transforms to empty name}, warning message.
+@samp{transforms to empty name}.  @xref{transform}.
 @end defvr
 
 @defvr {warning} missing-zero-blocks
@@ -4968,7 +4973,7 @@ Books, ISBN 1-56884-203-1.}.  The two most common errors are:
 
 @enumerate
 @item
-Mistakingly using @code{create} instead of @code{extract}, when the
+Mistakenly using @code{create} instead of @code{extract}, when the
 intent was to extract the full contents of an archive.  This error
 is likely: keys @kbd{c} and @kbd{x} are right next to each other on
 the QWERTY keyboard.  Instead of being unpacked, the archive then
@@ -7864,7 +7869,7 @@ files smaller than 400 blocks in length@footnote{A file system block
 is usually 512 bytes, so this amounts to 200K.  Use the @samp{c}
 suffix to specify size in @emph{bytes}.  Also, when using
 GNU find, you can specify other size units, such as @samp{k},
-@samp{m}, etc.  @xref{Size,,,find.info,GNU Findutils}, for details.} and put that list into a file
+@samp{m}, etc.  @xref{Size,,,find,GNU Findutils}, for details.} and put that list into a file
 called @file{small-files}.  You can then use the @option{-T} option to
 @command{tar} to specify the files from that file, @file{small-files}, to
 create the archive @file{little.tgz}.  (The @option{-z} option to
@@ -8906,7 +8911,9 @@ $ @kbd{tar -xf usr.tar --strip=2 usr/include/stdlib.h}
 
 The option @option{--strip=2} instructs @command{tar} to strip the
 two leading components (@file{usr/} and @file{include/}) off the file
-name.
+name, before extracting it.  Notice, that archive members to extract are
+searched before that modification, hence the file name is specified in
+full.
 
 If you add the @option{--verbose} (@option{-v}) option to the invocation
 above, you will note that the verbose listing still contains the
@@ -9022,7 +9029,6 @@ follows the GNU @command{sed} implementation in this regard, so
 the interaction is defined to be: ignore matches before the
 @var{number}th, and then match and replace all matches from the
 @var{number}th on.
-
 @end table
 
 In addition, several @dfn{transformation scope} flags are supported,
@@ -9156,11 +9162,47 @@ order of their appearance.  For example, the following two invocations
 are equivalent:
 
 @smallexample
-$ @kbd{tar -cf arch.tar --transform='s,/usr/var,/var/' \
+$ @kbd{tar -cf arch.tar --transform='s,/usr/var,/var/,' \
                         --transform='s,/usr/local,/usr/,'}
 $ @kbd{tar -cf arch.tar \
-               --transform='s,/usr/var,/var/;s,/usr/local,/usr/,'}
+               --transform='s,/usr/var,/var/,;s,/usr/local,/usr/,'}
 @end smallexample
+
+Applying transformations to some file names may produce empty
+strings.  This may indicate errors in regular expressions, but it may
+as well happen during normal operation, for instance, when using
+@option{--strip-components} option with a value which is greater then
+or equal to the number of directory components in the topmost
+directory stored in the archive.  Consider the following example.  Let
+the archive @file{usr.tar} contain:
+
+@example
+@group
+$ @kbd{tar tf usr.tar}
+usr/
+usr/local/
+...
+@end group
+@end example
+
+Extracting from this archive with the @option{--strip=1} option will
+transform the name of its first entry (@samp{usr/}) to an empty
+string.  When this happens, @GNUTAR{} prints a warning and skips this
+member:
+
+@example
+@group
+$ @kbd{tar --strip=1 -xf usr.tar}
+tar: usr: transforms to empty name
+@end group
+@end example
+
+If an empty name results from transformations applied when creating or
+updating the archive, the warning is output and the file is not
+archived.
+
+If this is intended, you can suppress the warning using the
+@option{--warning=no-empty-transform} option (@pxref{warnings}).
 
 @node after
 @section Operating Only on New Files
@@ -9617,6 +9659,10 @@ File names and symbolic links can contain at most 100 bytes.
 @item
 File sizes must be less than 8 GiB (@math{2^33} bytes = 8,589,934,592 bytes).
 @item
+File timestamps must be nonnegative and less than @math{2^33} seconds
+since the Epoch, corresponding to the range from 1970-01-01 00:00:00
+(inclusive) to 2242-03-16 12:56:32 (exclusive) UTC, ignoring leap seconds.
+@item
 It is impossible to store special files (block and character
 devices, fifos etc.)
 @item
@@ -9647,7 +9693,11 @@ So, in most cases file names must be a bit shorter than 255 bytes.
 @item
 Symbolic links can contain at most 100 bytes.
 @item
-Files can contain at most 8 GiB (@math{2^33} bytes = 8,589,934,592 bytes).
+File sizes must be less than 8 GiB (@math{2^33} bytes = 8,589,934,592 bytes).
+@item
+File timestamps must be nonnegative and less than @math{2^33} seconds
+since the Epoch, corresponding to the range from 1970-01-01 00:00:00
+(inclusive) to 2242-03-16 12:56:32 (exclusive) UTC, ignoring leap seconds.
 @item
 UIDs, GIDs, device major numbers, and device minor numbers
 must be less than @math{2^21} (2,097,152).
@@ -9655,18 +9705,19 @@ must be less than @math{2^21} (2,097,152).
 
 @item star
 The format used by the late J@"org Schilling's @command{star}
-implementation.  @GNUTAR{} is able to read @samp{star} archives but
-currently does not produce them.
+implementation.  @GNUTAR{} can read @samp{star} archives but
+does not produce them.
 
 @item posix
 The format defined by @acronym{POSIX.1-2001} and later.  This is the
 most flexible and feature-rich format.  It does not impose arbitrary
-restrictions on file sizes or file name lengths.  This format is more
+restrictions on file sizes or timestamps or file name lengths.
+This format is more
 recent, so some @command{tar} implementations cannot handle it properly.
 However, any @command{tar} implementation able to read @samp{ustar}
 archives should be able to read most @samp{posix} archives as well,
 except that it will extract any additional information (such as long
-file names) as extra plain text files.
+file names) as extra plain text files and their parent directories.
 
 This archive format will be the default format for future versions
 of @GNUTAR{}.
@@ -9676,13 +9727,13 @@ of @GNUTAR{}.
 The following table summarizes the limitations of each of these
 formats:
 
-@multitable @columnfractions .10 .20 .20 .20 .20
-@headitem Format @tab UID @tab File Size @tab File Name @tab Devn
-@item gnu    @tab 1.8e19 @tab Unlimited @tab Unlimited @tab 63
-@item oldgnu @tab 1.8e19 @tab Unlimited @tab Unlimited @tab 63
-@item v7     @tab 2097151 @tab 8 GiB @minus{} 1 @tab 99 @tab n/a
-@item ustar  @tab 2097151 @tab 8 GiB @minus{} 1 @tab 255 @tab 21
-@item posix  @tab Unlimited @tab Unlimited @tab Unlimited @tab Unlimited
+@multitable {Format} {no limit} {File Size} {File Date} {File Name} {no limit}
+@headitem Format @tab UID @tab File Size @tab File Date @tab File Name @tab Devn
+@item gnu    @tab 1.8e19 @tab no limit @tab no limit @tab no limit @tab 63
+@item oldgnu @tab 1.8e19 @tab no limit @tab no limit @tab no limit @tab 63
+@item v7     @tab 2097151 @tab < 8 GiB @tab 1970--2242 @tab 99 @tab n/a
+@item ustar  @tab 2097151 @tab < 8 GiB @tab 1970--2242 @tab 255 @tab 21
+@item posix  @tab no limit @tab no limit @tab no limit @tab no limit @tab no limit
 @end multitable
 
 The default format for @GNUTAR{} is defined at compilation
@@ -11760,10 +11811,8 @@ in chunks known as @dfn{records}.  To change the default blocking
 factor, use the @option{--blocking-factor=@var{512-size}} (@option{-b
 @var{512-size}}) option.  Each record will then be composed of
 @var{512-size} blocks.  (Each @command{tar} block is 512 bytes.
-@xref{Standard}.)  Each file written to the archive uses at least one
-full record.  As a result, using a larger record size can result in
-more wasted space for small files.  On the other hand, a larger record
-size can often be read and written much more efficiently.
+@xref{Standard}.)  On some devices, a larger record size can be read
+and written much more efficiently.
 
 Further complicating the problem is that some tape drives ignore the
 blocking entirely.  For these, a larger record size can still improve

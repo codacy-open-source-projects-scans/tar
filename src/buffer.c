@@ -33,6 +33,8 @@
 #include "common.h"
 #include <rmt.h>
 
+#include <stdcountof.h>
+
 /* Work around GCC bug 117236.  */
 # if 13 <= __GNUC__
 #  pragma GCC diagnostic ignored "-Wnull-dereference"
@@ -328,7 +330,6 @@ static struct zip_magic const magic[] = {
   { ct_xz,       6, "\xFD" "7zXZ" },
   { ct_zstd,     4, "\x28\xB5\x2F\xFD" },
 };
-enum { n_zip_magic = sizeof magic / sizeof *magic };
 
 static struct zip_program zip_program[] = {
   { ct_compress, COMPRESS_PROGRAM, "-Z" },
@@ -343,14 +344,13 @@ static struct zip_program zip_program[] = {
   { ct_xz,       XZ_PROGRAM,       "-J" },
   { ct_zstd,     ZSTD_PROGRAM,     "--zstd" },
 };
-enum { n_zip_programs = sizeof zip_program / sizeof *zip_program };
 
 static struct zip_program const *
 find_zip_program (enum compress_type type, int *pstate)
 {
   int i;
 
-  for (i = *pstate; i < n_zip_programs; i++)
+  for (i = *pstate; i < countof (zip_program); i++)
     {
       if (zip_program[i].type == type)
 	{
@@ -367,7 +367,7 @@ first_decompress_program (int *pstate)
 {
   struct zip_program const *zp;
 
-  *pstate = n_zip_programs;
+  *pstate = countof (zip_program);
 
   if (use_compress_program_option)
     return use_compress_program_option;
@@ -419,17 +419,16 @@ check_compressed_archive (bool *pshort)
   read_full_records = sfr;
 
   if (record_start != record_end /* no files smaller than BLOCKSIZE */
-      && (memcmp (record_start->header.magic, TMAGIC, sizeof TMAGIC) == 0
-          || (memcmp (record_start->buffer + offsetof (struct posix_header,
-						       magic),
-		      OLDGNU_MAGIC, sizeof OLDGNU_MAGIC)
-	      == 0))
+      && (memeq (record_start->header.magic, TMAGIC, sizeof TMAGIC)
+          || memeq (record_start->buffer + offsetof (struct posix_header,
+						     magic),
+		    OLDGNU_MAGIC, sizeof OLDGNU_MAGIC))
       && tar_checksum (record_start, true) == HEADER_SUCCESS)
     /* Probably a valid header */
     return ct_tar;
 
-  for (p = magic + 2; p < magic + n_zip_magic; p++)
-    if (memcmp (record_start->buffer, p->magic, p->length) == 0)
+  for (p = magic + 2; p < magic + countof (magic); p++)
+    if (memeq (record_start->buffer, p->magic, p->length))
       return p->type;
 
   return ct_none;
@@ -656,14 +655,6 @@ available_space_after (union block *pointer)
   return charptr (record_end) - charptr (pointer);
 }
 
-/* Close file having descriptor FD, and abort if close unsuccessful.  */
-void
-xclose (int fd)
-{
-  if (close (fd) < 0)
-    close_error (_("(pipe)"));
-}
-
 static void
 init_buffer (void)
 {
@@ -679,7 +670,7 @@ static void
 check_tty (enum access_mode mode)
 {
   /* Refuse to read archive from and write it to a tty. */
-  if (strcmp (archive_name_array[0], "-") == 0
+  if (streq (archive_name_array[0], "-")
       && isatty (mode == ACCESS_READ ? STDIN_FILENO : STDOUT_FILENO))
     {
       paxfatal (0, (mode == ACCESS_READ
@@ -777,10 +768,10 @@ _open_archive (enum access_mode wanted_access)
 
       if (!index_file_name
           && wanted_access == ACCESS_WRITE
-          && strcmp (archive_name_array[0], "-") == 0)
+          && streq (archive_name_array[0], "-"))
         stdlis = stderr;
     }
-  else if (strcmp (archive_name_array[0], "-") == 0)
+  else if (streq (archive_name_array[0], "-"))
     {
       read_full_records = true; /* could be a pipe, be safe */
       if (verify_option)
@@ -1366,7 +1357,7 @@ new_volume (enum access_mode mode)
         change_tape_menu (read_file);
     }
 
-  if (strcmp (archive_name_cursor[0], "-") == 0)
+  if (streq (archive_name_cursor[0], "-"))
     {
       read_full_records = true;
       archive = STDIN_FILENO;
@@ -1540,7 +1531,7 @@ try_new_volume (void)
 	  return false;
 	}
 
-      if (strcmp (continued_file_name, bufmap_head->file_name) != 0)
+      if (!streq (continued_file_name, bufmap_head->file_name))
         {
           if ((archive_format == GNU_FORMAT || archive_format == OLDGNU_FORMAT)
               && strlen (bufmap_head->file_name) >= NAME_FIELD_SIZE
@@ -1598,7 +1589,7 @@ drop_volume_label_suffix (const char *label)
       prefix_len = i + 1;
 
   ptrdiff_t len = prefix_len - VOLUME_TEXT_LEN;
-  return (0 <= len && memcmp (label + len, VOLUME_TEXT, VOLUME_TEXT_LEN) == 0
+  return (0 <= len && memeq (label + len, VOLUME_TEXT, VOLUME_TEXT_LEN)
 	  ? ximemdup0 (label, len)
 	  : NULL);
 }

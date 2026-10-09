@@ -136,16 +136,28 @@ enforce_one_top_level (char **pfile_name)
       idx_t pos = strlen (one_top_level_dir);
       if (strncmp (p, one_top_level_dir, pos) == 0)
 	{
-	  if (ISSLASH (p[pos]) || p[pos] == 0)
-	    return;
+	  /* Remove the one_top_level_dir prefix if it ends at
+	     component boundary.  */
+	  if (ISSLASH (p[pos]))
+	    {
+	      *pfile_name = xstrdup (p[pos+1] ? &p[pos+1] : ".");
+	      free (file_name);
+	      return;
+	    }
+	  else if (p[pos] == 0)
+	    {
+	      *pfile_name = xstrdup (".");
+	      free (file_name);
+	      return;
+	    }
 	}
-
-      *pfile_name = make_file_name (one_top_level_dir, file_name);
-      normalize_filename_x (*pfile_name);
+      /* If the prefix does not match, do nothing.  */
     }
   else
-    *pfile_name = xstrdup (one_top_level_dir);
-  free (file_name);
+    {
+      *pfile_name = xstrdup (".");
+      free (file_name);
+    }
 }
 
 bool
@@ -171,7 +183,14 @@ transform_stat_info (char typeflag, struct tar_stat_info *stat_info)
     }
 
   if (one_top_level_dir)
-    enforce_one_top_level (&stat_info->file_name);
+    {
+      enforce_one_top_level (&stat_info->file_name);
+      /* Hard links are interpreted relative to cwd, and --one-top-level
+	 works by means of a hidden change of cwd to the requested directory.
+	 Adjust hard link targets as well.  */
+      if (typeflag == LNKTYPE)
+	enforce_one_top_level (&stat_info->link_name);
+    }
   return true;
 }
 
@@ -337,13 +356,14 @@ list_archive (void)
 }
 
 /* Check header checksum */
-/* The standard BSD tar sources create the checksum by adding up the
-   bytes in the header as type char.  I think the type char was unsigned
-   on the PDP-11, but it's signed on the Next and Sun.  It looks like the
-   sources to BSD tar were never changed to compute the checksum
-   correctly, so both the Sun and Next add the bytes of the header as
-   signed chars.  This doesn't cause a problem until you get a file with
-   a name containing characters with the high bit set.  So tar_checksum
+
+/* 7th Edition Unix tar created the checksum by adding the bytes
+   in the header as type char, which was signed.  This caused the
+   checksum to disagree when the same code was later compiled on
+   platforms where char was unsigned.  Although POSIX.1-1988
+   standardized on using unsigned char for checksums, old tar files
+   created by pre-standard programs may have used plain char,
+   which may happen to have been signed.  So tar_checksum
    computes two checksums -- signed and unsigned.  */
 
 enum read_header
@@ -534,6 +554,22 @@ read_header (union block **return_block, struct tar_stat_info *info,
 	  char const *name;
 	  struct posix_header const *h = &header->header;
 	  char namebuf[sizeof h->prefix + 1 + NAME_FIELD_SIZE + 1];
+
+	  switch (h->typeflag)
+	    {
+	    /* For these file types, although POSIX does not specify the
+	       meaning of the size, it does say there should be no data,
+	       so treat the size as zero.  */
+	    case BLKTYPE: case CHRTYPE: case FIFOTYPE:
+
+	    /* For these file types, POSIX requires that the size be zero.
+	       Be generous and accept any size as zero, as some
+	       nonconforming programs generate nonzero size fields along
+	       with no data.  */
+	    case LNKTYPE: case SYMTYPE:
+
+	      info->stat.st_size = 0;
+	    }
 
 	  free (recent_long_name);
 
@@ -1112,10 +1148,10 @@ static void
 simple_print_header (struct tar_stat_info *st, union block *blk,
 		     off_t block_ordinal)
 {
-  char *temp_name
-    = (show_transformed_names_option
-       ? (st->file_name ? st->file_name : st->orig_file_name)
-       : (st->orig_file_name ? st->orig_file_name : st->file_name));
+  char *temp_name =
+    (show_transformed_names_option
+     ? transform_top_level (st->file_name ? st->file_name : st->orig_file_name)
+     : xstrdup (st->orig_file_name ? st->orig_file_name : st->file_name));
 
   if (block_number_option)
     {
@@ -1314,6 +1350,7 @@ simple_print_header (struct tar_stat_info *st, union block *blk,
     }
   fflush (stdlis);
   xattrs_print (st);
+  free (temp_name);
 }
 
 
@@ -1420,6 +1457,24 @@ skip_member (void)
   skim_member (false);
 }
 
+static bool
+member_is_dir (struct tar_stat_info *info, char typeflag)
+{
+  switch (typeflag)
+    {
+    case AREGTYPE:
+    case REGTYPE:
+    case CONTTYPE:
+      return info->had_trailing_slash;
+
+    case DIRTYPE:
+      return true;
+
+    default:
+      return false;
+    }
+}
+
 /* Skip the current member in the archive.
    If MUST_COPY, always copy instead of skipping.  */
 void
@@ -1433,7 +1488,8 @@ skim_member (bool must_copy)
 
       if (current_stat_info.is_sparse)
 	sparse_skim_file (&current_stat_info, must_copy);
-      else
+      else if (!member_is_dir (&current_stat_info,
+			       current_header->header.typeflag))
 	skim_file (current_stat_info.stat.st_size, must_copy);
 
       mv_end ();

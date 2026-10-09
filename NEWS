@@ -1,4 +1,4 @@
-GNU tar NEWS - User visible changes. 2026-04-04
+GNU tar NEWS - User visible changes. 2026-09-30
 Please send GNU tar bug reports to <bug-tar@gnu.org>
 
 version 1.35.90 (git)
@@ -35,8 +35,17 @@ empty string that file or member is skipped and a warning is printed.
 The warning can be suppressed using the --warning=empty-transform
 option.
 
-** --one-top-level=DIR now requires DIR to be relative.
-   Previously this restriction was alluded to in the manual but not enforced.
+** The --one-top-level option now requires either -x or -d mode.
+   Previously the behavior was unspecified in other operation modes.
+
+** If DIR is absolute, the --one-top-level=DIR option is now incompatible
+   with the --directory (-C) option, and it now extracts all files
+   relative to DIR, without stripping leading DIR from file names.
+   Formerly, the behavior was undocumented and differed from one tar
+   version to the next.
+
+** Support for RTU-style contiguous files has been withdrawn.
+   RTU’s supplier dropped support for RTU decades ago.
 
 * Bug fixes
 
@@ -72,6 +81,11 @@ option.
 
 ** tar --ignore-failed-read no longer complains about a file removed
    before reading.
+
+** tar no longer behaves erratically when reading nonzero size fields
+   in archive headers representing special files, fifos, and symlinks.
+   Although these size fields are typically zero, POSIX allows some to
+   be nonzero, and in practice they do not count data blocks.
 
 * Performance improvements
 
@@ -208,7 +222,7 @@ Bug introduced with the addition of that option in 1.28.
 * Support for zstd compression
 
 New option '--zstd' instructs tar to use zstd as compression program.
-When listing, extractng and comparing, zstd compressed archives are
+When listing, extracting and comparing, zstd compressed archives are
 recognized automatically.
 When '-a' option is in effect, zstd compression is selected if the
 destination archive name ends in '.zst' or '.tzst'.
@@ -774,7 +788,7 @@ the following variables:
 ** Fix restoring files from backup (debian bug #508199).
 ** Correctly restore modes and permissions on existing directories.
 ** The --remove-files option removes files only if they were
-succesfully stored in the archive.
+successfully stored in the archive.
 ** Fix storing and listing of the volume labels in POSIX format.
 ** Improve algorithm for splitting long file names (ustar
 format).
@@ -1119,8 +1133,8 @@ for example, while comparing 'tar cv' and 'tar tv' outputs.
 as well as that about directories.
 
 ** The --checkpoint option takes an optional argument specifying the number
-of records between the two successive checkpoints.   Optional dot
-starting the argument intructs tar to print dots instead of textual
+of records between the two successive checkpoints.   An optional dot
+starting the argument instructs tar to print dots instead of textual
 checkpoints.
 
 ** The --totals option can be used with any tar operation (previous versions
@@ -1234,7 +1248,7 @@ tar to refuse to extract files from standard input.
 
 version 1.15 - Sergey Poznyakoff, 2004-12-20
 
-* Compressed archives are recognised automatically, it is no longer
+* Compressed archives are recognized automatically; it is no longer
 necessary to specify -Z, -z, or -j options to read them.  Thus, you can
 now run 'tar tf archive.tar.gz'.
 
@@ -1477,7 +1491,7 @@ version 1.13.16 - Paul Eggert, 1999-12-13.
   before extracting it.  If the existing file is a symbolic link, the
   link is removed and not the pointed-to file.  There is one
   exception: existing nonempty directories are not removed, nor are
-  their ownerships or permissions extracted.  This fixes some
+  their ownership or permissions extracted.  This fixes some
   longstanding security problems.
 
   The new --overwrite option enables the old default behavior.

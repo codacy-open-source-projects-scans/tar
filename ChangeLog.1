@@ -1794,7 +1794,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 	and delete TOO_MANY_COMMAND.  Turn these into an enum and declare
 	main_command_option of this enum type, to replace command_mode,
 	which was an int, everywhere.
-	* tar.c (decode_options): Initialise main_command_option.
+	* tar.c (decode_options): Initialize main_command_option.
 	(set_main_command_option): New function to replace
 	SET_COMMAND_MODE.  Diagnostic ambiguous command as soon as seen.
 	However, be forgiving if command has merely been repeated.
@@ -1896,7 +1896,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 	(process_rawdata, process_dumpdir): Adjusted.
 
 	* compare.c: Remove different as a global variable, it is useless.
-	(diff_sparse_files): Make different a local variable, reinitialise
+	(diff_sparse_files): Make different a local variable, reinitialize
 	it on each call.  Otherwise, after any error elsewhere, all sparse
 	files were always and falsely reported as erroneous.
 	Reported by James E. Carpenter and Tim Towers.
@@ -1975,7 +1975,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 	appropriately, using initializers when natural, and moving them
 	closer to the blocks where they are used.
 
-	A bit of reorganisation in the sources:
+	A bit of reorganization in the sources:
 	* common.h: New file, for holding all GNU tar specific definitions,
 	which were previously held in tar.h.
 	* tar.h: Now limited to the archive format description only.
@@ -5866,7 +5866,7 @@ Previous releases by Jay Fenlason (hack@ai.mit.edu)
 	* Makefile.am ($(TESTS)): Depend on preset.
 	* version.sh (PATH): Adjust for multi-line --version output.
 	* preset.in (LANG, LANGUAGE): Export them, so gzip does not
-	localise its own output.
+	localize its own output.
 	(echo_n, echo_c): Define from the result of echo configuration.
 	* after: Handle echo with newline suppressed.
 

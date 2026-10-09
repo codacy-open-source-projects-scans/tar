@@ -1,28 +1,37 @@
-# Copyright 2006-2026 Free Software Foundation, Inc.
-
+# Process this file with autom4te to create testsuite. -*- Autotest -*-
+#
+# Test suite for GNU tar.
+# Copyright 2026 Free Software Foundation, Inc.
+#
 # This file is part of GNU tar.
-
+#
 # GNU tar is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation; either version 3 of the License, or
 # (at your option) any later version.
-
+#
 # GNU tar is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-
+#
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+AT_SETUP([tar --one-top-level into nonexistent absolute dir])
+AT_KEYWORDS([extract onetop onetop06])
 
-1{s,/\*,@comment ,
-b
-}
-2,/.*\*\//{s,\*/,,;s/^/@comment/
-b
-}
-/\/* END \*\//,$d
-s/\([{}]\)/@\1/g
-s,/\*,&@r{,
-s,\*/,}&,
-s/ö/@"{o}/g
+AT_TAR_CHECK([
+mkdir d f && genfile --file d/file || framework_failure_
+tar -cf test.tar d || exit
+tar -xf test.tar --one-top-level=$PWD/e/c || exit
+diff d e/c/d || exit
+tar -xf test.tar --one-top-level=$PWD/e/d || exit
+diff d e/d/d || exit
+
+tar -cf test1.tar e/c || exit
+tar -xf test1.tar -C f --one-top-level=e/c || exit
+diff e/c/d f/e/c/d || exit
+])
+
+AT_CLEANUP

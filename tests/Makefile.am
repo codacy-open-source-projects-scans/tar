@@ -110,6 +110,9 @@ TESTSUITE_AT = \
  exclude18.at\
  exclude19.at\
  exclude20.at\
+ exclude21.at\
+ exclude22.at\
+ exclude23.at\
  extrac01.at\
  extrac02.at\
  extrac03.at\
@@ -142,6 +145,9 @@ TESTSUITE_AT = \
  extrac30.at\
  extrac31.at\
  extrac32.at\
+ extrac33.at\
+ extrac34.at\
+ extrac35.at\
  filerem01.at\
  filerem02.at\
  filerem03.at\
@@ -198,6 +204,8 @@ TESTSUITE_AT = \
  onetop03.at\
  onetop04.at\
  onetop05.at\
+ onetop06.at\
+ onetop07.at\
  opcomp01.at\
  opcomp02.at\
  opcomp03.at\
@@ -242,6 +250,8 @@ TESTSUITE_AT = \
  rename04.at\
  rename05.at\
  rename06.at\
+ rename08.at\
+ rename09.at\
  same-order01.at\
  same-order02.at\
  selacl01.at\

@@ -454,7 +454,7 @@ file_dumpable_p (struct stat const *st)
 {
   if (S_ISDIR (st->st_mode))
     return true;
-  if (! (S_ISREG (st->st_mode) || S_ISCTG (st->st_mode)))
+  if (!S_ISREG (st->st_mode))
     return false;
   if (dev_null_output)
     return totals_option && sparse_option && ST_IS_SPARSE (*st);
@@ -1028,10 +1028,6 @@ dump_regular_file (int fd, struct tar_stat_info *st)
   if (!blk)
     return dump_status_fail;
 
-  /* Mark contiguous files, if we support them.  */
-  if (archive_format != V7_FORMAT && S_ISCTG (st->stat.st_mode))
-    blk->header.typeflag = CONTTYPE;
-
   finish_header (st, blk, block_ordinal);
 
   mv_begin_write (st->file_name, st->stat.st_size, st->stat.st_size);
@@ -1342,10 +1338,7 @@ create_archive (void)
 		    {
 		      if (! st.orig_file_name)
 			{
-			  struct fdbase f = fdbase (p->name);
-			  int fd = (f.fd == BADFD ? -1
-				    : openat (f.fd, f.base,
-					      open_searchdir_how.flags));
+			  int fd = open_searchdir (p->name);
 			  if (fd < 0)
 			    {
 			      file_removed_diag (p->name, !p->parent,
@@ -1584,9 +1577,7 @@ restore_parent_fd (struct tar_stat_info const *st)
 
       if (parentfd < 0)
 	{
-	  struct fdbase f = fdbase (parent->orig_file_name);
-	  int origfd = (f.fd == BADFD ? -1
-			: openat (f.fd, f.base, open_searchdir_how.flags));
+	  int origfd = open_searchdir (parent->orig_file_name);
 	  if (0 <= origfd)
 	    {
 	      if (fstat (origfd, &parentstat) < 0
@@ -1717,7 +1708,7 @@ dump_file0 (struct tar_stat_info *st, char const *name, char const *p)
   if (!is_dir && dump_hard_link (st))
     return allocated;
 
-  if (is_dir || S_ISREG (st->stat.st_mode) || S_ISCTG (st->stat.st_mode))
+  if (is_dir || S_ISREG (st->stat.st_mode))
     {
       bool ok;
       struct stat st2;

@@ -26,7 +26,7 @@
 # In case of files tar does not return TAREXIT_FAILURE, but instead
 # it prints a warning and exits with TAREXIT_DIFFERS.
 #
-# This test checks whether this behaviour is mimicked for directories, too.
+# This test checks whether this behavior is mimicked for directories, too.
 #
 # Notes:
 #   1. This file is based on 'filerem01.at', which is the test-case for

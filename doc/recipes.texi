@@ -53,7 +53,7 @@ $ @kbd{tar --directory sourcedir --create --file=- . \
 @node intermediate directories
 @appendixsec Restoring Intermediate Directories
 
-A common concern is how to extract permissions and ownerships of
+A common concern is how to extract permissions and ownership of
 intermediate directories when extracting only selected members from
 the archive.  To illustrate this, consider the following archive:
 
@@ -90,7 +90,7 @@ permissions. The intermediate directories, however, are created with
 the default permissions, current timestamp and owned by the current
 user. This is because by the time @command{tar} has reached the requested file,
 it had already skipped the entries for its parent directories, so it
-has no iformation about their ownership and modes.
+has no information about their ownership and modes.
 
 To restore meta information about the intermediate directories,
 you'll need to specify them explicitly in the command line and use the

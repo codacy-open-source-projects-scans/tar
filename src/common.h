@@ -558,6 +558,7 @@ void verify_volume (void);
 extern dev_t root_device;
 
 void extr_init (void);
+bool create_dir (char *dir);
 void extract_archive (void);
 void extract_finish (void);
 bool rename_directory (char *src, char *dst);
@@ -589,6 +590,7 @@ void purge_directory (char const *directory_name);
 void list_dumpdir (char *buffer, idx_t size);
 void update_parent_directory (struct tar_stat_info *st);
 
+bool dumpdir_ok (char const *dumpdir, idx_t size);
 idx_t dumpdir_size (const char *p);
 bool is_dumpdir (struct tar_stat_info *stat_info);
 void clear_directory_table (void);
@@ -686,6 +688,8 @@ void namebuf_free (namebuf_t buf);
 char *namebuf_name (namebuf_t buf, const char *name);
 
 const char *tar_dirname (void);
+char *transform_top_level (const char *name)
+  _GL_ATTRIBUTE_MALLOC _GL_ATTRIBUTE_DEALLOC_FREE;
 
 /* intmax (N) is like ((intmax_t) (N)) except without a cast so
    that it is an error if N is a pointer.  */
@@ -778,11 +782,14 @@ idx_t blocking_write (int fd, void const *buf, idx_t count);
 enum { BADFD = AT_FDCWD == -1 ? -2 : -1 };
 
 extern idx_t chdir_current;
-idx_t chdir_arg (char const *dir);
-void chdir_do (idx_t dir);
+idx_t chdir_arg (char *dir);
+void chdir_do (idx_t dir, bool create);
 struct chdir_id { int err; dev_t st_dev; ino_t st_ino; } chdir_id (void);
 struct fdbase fdbase (char const *);
 struct fdbase fdbase1 (char const *);
+struct fdbase fdbase_escape (char const *, bool);
+int open_searchdir (char const *);
+int fdbase_close (int);
 void fdbase_clear (void);
 idx_t chdir_count (void);
 

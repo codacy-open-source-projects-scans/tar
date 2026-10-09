@@ -2446,6 +2446,11 @@ exist in the archive. @xref{update}.
 @subsection @command{tar} Options
 
 @table @option
+@opsummary{add-file}
+@item --add-file=@var{file}
+This option has the same effect as adding @var{file} to the command
+line.  It is useful if @var{file} begins with a @samp{-} and can be
+confused with a command-line option (@pxref{add-file}).
 
 @opsummary{absolute-names}
 @item --absolute-names
@@ -2523,7 +2528,7 @@ superuser privileges and can be a pain to manage.
 
 During a @option{--create} operation, enables automatic compressed
 format recognition based on the archive suffix.  The effect of this
-option is cancelled by @option{--no-auto-compress}.  @xref{gzip}.
+option is canceled by @option{--no-auto-compress}.  @xref{gzip}.
 
 @opsummary{backup}
 @item --backup=@var{backup-type}
@@ -2670,8 +2675,17 @@ access files outside the working directory.  @xref{dereference}.
 @itemx -C @var{dir}
 
 When this option is specified, @command{tar} will change its working directory
-to @var{dir} before performing any operations.  When this option is used
-during archive creation, it is order sensitive.  @xref{directory}.
+to @var{dir} before performing file archival or extraction
+operations.  This option is @dfn{position-sensitive}, i.e. it
+affects the arguments that follow it.  In particular, any relative file names
+supplied in the command line after it (or read from a file given with
+the @option{-T} option appearing after it) are assumed to be relative to
+@var{dir}.  It does not, however, affect file name arguments to other
+@emph{options}, such as @option{-f}, @option{-T}, or the like.
+
+@xref{directory}, for a detailed discussion of @option{-C} and its
+effect, and @ref{Position-Sensitive Options}, for a discussion of
+position-sensitive options.
 
 @opsummary{exclude}
 @item --exclude=@var{pattern}
@@ -3273,20 +3287,12 @@ directory.
 
 @opsummary{one-top-level}
 @item --one-top-level[=@var{dir}]
-Tells @command{tar} to create a new directory beneath the extraction directory
-(or the one passed to @option{-C}) and use it to prevent @command{tar}
-from modifying files outside that directory.
-If @var{dir} is present, it must be a relative file name.
-If it is absent, the name of the new directory
-is the base name of the archive minus any recognized archive suffix.
-If multiple @option{-C} options are present,
-each has its own subdirectory with the same name.
-Any member names that do not begin
-with that directory name (after
-transformations from @option{--transform} and
-@option{--strip-components}) will be prefixed with it.  Recognized
-file name suffixes are @samp{.tar}, and any compression suffixes
-recognizable by @xref{--auto-compress}.
+Extract files relative to @var{dir},
+ignoring any @var{dir} prefixes in the archive.
+An absent @var{dir} defaults to
+the base name of the archive minus any recognized archive suffix.
+If @var{dir} is relative, it is relative to the working directory.
+@xref{directory}.
 
 @opsummary{overwrite}
 @item --overwrite
@@ -7893,8 +7899,9 @@ with @samp{-} character, it is considered a @command{tar} option and is
 processed accordingly@footnote{Versions of @GNUTAR{} up to 1.15.1
 recognized only @option{-C} option in file lists, and only if the
 option and its argument occupied two consecutive lines.}.  Only a
-subset of @GNUTAR{} options is allowed for use in file lists.  For
-a list of such options, @ref{Position-Sensitive Options}.
+subset of @GNUTAR{} options is allowed for use in file lists: the
+options described in @ref{Position-Sensitive Options}, and the
+@option{--add-file} option, discussed below.
 
 For example, the common use of this feature is to change to another
 directory by specifying @option{-C} option:
@@ -7954,14 +7961,12 @@ The @option{--verbatim-files-from} affects all @option{-T} options
 that follow it in the command line.  The default behavior can be
 restored using @option{--no-verbatim-files-from} option.
 
+@anchor{add-file}
 @opindex add-file
-To disable option handling for a single file name, use the
-@option{--add-file} option, e.g.: @code{--add-file=--my-file}.
+The option @option{--add-file} is provided to add file names that look
+like command-line options, e.g.: @code{--add-file=--my-file}.
 
-You can use any @GNUTAR{} command line options in the file list file,
-including @option{--files-from} option itself.  This allows for
-including contents of a file list into another file list file.
-Note however, that options that control file list processing, such as
+Notice, that options that control file list processing, such as
 @option{--verbatim-files-from} or @option{--null} won't affect the
 file they appear in.  They will affect next @option{--files-from}
 option, if there is any.
@@ -9424,26 +9429,61 @@ mentioned by name on the standard error.
 @node directory
 @subsection Changing the Working Directory
 
-@FIXME{need to read over this node now for continuity; i've switched
-things around some.}
-
-@cindex Changing directory mid-stream
-@cindex Directory, changing mid-stream
+@cindex Changing working directory
+@cindex Directory, changing
 @cindex Working directory, specifying
 To change the working directory in the middle of a list of file names,
 either on the command line or in a file specified using
 @option{--files-from} (@option{-T}), use @option{--directory} (@option{-C}).
 This will change the working directory to the specified directory
 after that point in the list.
+You can also use the @code{--one-top-level} option to alter
+the working directory location, though this option applies to all file names.
 
 @table @option
 @opindex directory
 @item --directory=@var{directory}
 @itemx -C @var{directory}
-Changes the working directory in the middle of a command line.
+Change the working directory for later files in the command line.
+
+@item --one-top-level
+@item --one-top-level[=@var{dir}]
+Change the effective working directory to @var{dir} for all files.
+If @var{dir} does not already exist, create it and any ancestors as
+necessary before extracting any files into it.
+
+If @var{dir} is relative, extract all files under that directory;
+if @option{-C} is also given,
+@var{dir} is relative to the @option{-C} directory.
+Prefix any member names that do not begin with @var{dir}
+(after transformations from @option{--transform} and
+@option{--strip-components}) with @var{dir}.
+An absent @var{dir} defaults to the base name of the archive
+minus any recognized archive suffix.
+Recognized file name suffixes are @samp{.tar},
+and any compression suffixes recognizable by @xref{--auto-compress}.
+
+If @var{dir} is absolute, extract all files under that directory;
+@var{dir} itself is exempt from the usual safety rules
+prohibiting extraction outside the working directory.
+The two main differences between @samp{--one-top-level=/abs/olute}
+and @samp{-C /abs/olute} are that the former affects all files
+whereas the latter affects only later files,
+and in the former @file{/abs/olute} and its ancestors are created
+if they do not already exist
+whereas in the latter @file{/abs/olute} must already exist.
+
+The @option{--one-top-level} option can be used only when extracting,
+comparing, or reading from the archive.
+It is incompatible with the @option{--absolute-names} (@option{-P}) option,
+and if @var{dir} is absolute it is incompatible with the
+@option{--directory} (@option{-C}) option.
 @end table
 
-For example,
+All filename arguments appearing after a
+@option{--directory=@var{directory}} (@option{-C @var{directory}}) option
+are taken
+relative to @var{directory}.  For example,
 
 @smallexample
 $ @kbd{tar -c -f jams.tar grape prune -C food cherry}
@@ -9496,19 +9536,50 @@ relative to the then working directory, which might not be the same as
 the original working directory of @command{tar}, due to a previous
 @option{--directory} option.
 
-When using @option{--files-from} (@pxref{files}), you can put various
-@command{tar} options (including @option{-C}) in the file list.  Notice,
-however, that in this case the option and its argument may not be
-separated by whitespace.  If you use short option, its argument must
-either follow the option letter immediately, without any intervening
-whitespace, or occupy the next line.  Otherwise, if you use long
-option, separate its argument by an equal sign.
+There is an important exception, though: the @option{-C} option does
+not affect filename arguments to other options that follow it, in
+particular @option{-f}.  This means that the example above can be
+written as
 
+@smallexample
+$ @kbd{tar -c -C /etc -f foo.tar passwd hosts -C /lib libc.a}
+@end smallexample
+
+@noindent
+and it will not change its overall effect: the files
+@file{passwd} and @file{hosts} will be read from the directory
+@file{/etc}, but the archive @file{foo.tar} will be created in the
+directory which was the working directory when the @command{tar}
+command was started.
+
+The command-line options not affected by @option{-C} are:
+
+@itemize @bullet
+@item @option{-g}, @option{--listed-incremental}
+@item @option{--exclude-ignore}
+@item @option{--exclude-ignore-recursive}
+@item @option{--exclude-tag}
+@item @option{--exclude-tag-all}
+@item @option{--exclude-tag-under}
+@item @option{-T}, @option{--files-from}
+@item @option{-X}, @option{--exclude-from}
+@item @option{--mtime}
+@item @option{--one-top-level=@var{dir}} when @var{dir} is absolute
+@item @option{--owner-map}
+@item @option{-f}, @option{--file}
+@item @option{-F}, @option{--info-script}, @option{--new-volume-script}
+@item @option{--volno-file}
+@item @option{-N}, @option{--newer}
+@item @option{--index-file}
+@end itemize
+
+When using @option{--files-from} (@pxref{files}), you can put certain
+@command{tar} options (including @option{-C}) in the file list as well.
 For instance, the file list for the above example will be:
 
 @smallexample
 @group
--C/etc
+-C /etc
 passwd
 hosts
 --directory=/lib
@@ -9522,6 +9593,9 @@ To use it, you would invoke @command{tar} as follows:
 @smallexample
 $ @kbd{tar -c -f foo.tar --files-from list}
 @end smallexample
+
+For a full list of options that can be used in file lists,
+@ref{Position-Sensitive Options}.
 
 The interpretation of options in file lists is disabled by
 @option{--verbatim-files-from} and @option{--null} options.
@@ -9686,7 +9760,7 @@ must be less than @math{2^21} (2,097,152).
 @end enumerate
 
 @item star
-The format used by the late J@"org Schilling's @command{star}
+The format used by the late J@"{o}rg Schilling's @command{star}
 implementation.  @GNUTAR{} can read @samp{star} archives but
 does not produce them.
 
@@ -10314,7 +10388,7 @@ the numeric ids from the archive, ignoring the names.
 
 This is useful in certain circumstances, when restoring a backup from
 an emergency floppy with different passwd/group files for example.
-It is otherwise impossible to extract files with the right ownerships
+It is otherwise impossible to extract files with the right ownership
 if the password file in use during the extraction does not match the
 one belonging to the file system(s) being extracted.  This occurs,
 for example, if you are restoring your files after a major crash and
@@ -10606,7 +10680,7 @@ To force creation a @GNUTAR{} archive, use option
 Starting from version 1.14 @GNUTAR{} features full support for
 @acronym{POSIX.1-2001} archives.
 
-A @acronym{POSIX} conformant archive will be created if @command{tar}
+An archive conforming to @acronym{POSIX} will be created if @command{tar}
 was given @option{--format=posix} (@option{--format=pax}) option.  No
 special option is required to read and extract from a @acronym{POSIX}
 archive.
@@ -11353,7 +11427,7 @@ file name lengths.  The binary and old @acronym{ASCII} formats have a maximum fi
 length of 256, and the new @acronym{ASCII} and @acronym{CRC ASCII} formats have a max
 file length of 1024.  @acronym{GNU} @command{cpio} can read and write archives
 with arbitrary file name lengths, but other @command{cpio} implementations
-may crash unexplainedly trying to read them.
+may crash trying to read them.
 
 @command{tar} handles symbolic links in the form in which it comes in @acronym{BSD};
 @command{cpio} doesn't handle symbolic links in the form in which it comes
@@ -11466,7 +11540,7 @@ the creation and manipulation of archives located on magnetic tape was
 the original purpose of @command{tar}, it contains many features making
 such manipulation easier.
 
-Archives are usually written on dismountable media---tape cartridges,
+Archives are usually written on mountable media---tape cartridges,
 mag tapes, or floppy disks.
 
 The amount of data a tape or disk holds depends not only on its size,
@@ -13124,8 +13198,10 @@ by an untrusted user, that user therefore can write into any file
 under the working directory.  When extracting from an
 untrusted archive, it is therefore good practice to create an empty
 directory and run @command{tar} in that directory.  You can use the
-@option{--directory} (@option{-C}) option to specify the working
-directory (@pxref{directory}).
+@option{--directory} (@option{-C}) and @option{--one-top-level}
+options to specify the working directory; the latter option starts by
+creating the working directory for you if it does not already exist.
+@xref{directory}.
 
 When extracting from an archive, @command{tar} by default rejects attempts to
 modify files outside the working directory.

@@ -26,7 +26,7 @@
 #include <same-inode.h>
 #include "common.h"
 
-/* Incremental dump specialities.  */
+/* Incremental dump specialties.  */
 
 /* Which child files to save under a directory.  */
 enum children
@@ -123,6 +123,7 @@ dir_set_flag (struct directory *d, int f)
 {
   d->flags |= f;
 }
+
 static void
 dir_clear_flag (struct directory *d, int f)
 {
@@ -1525,6 +1526,12 @@ get_gnu_dumpdir (struct tar_stat_info *stat_info)
 
   mv_end ();
 
+  if (!dumpdir_ok (archive_dir, stat_info->stat.st_size))
+    {
+      stat_info->is_dumpdir = false;
+      free (archive_dir);
+      archive_dir = NULL;
+    }
   stat_info->dumpdir = archive_dir;
   stat_info->skipped = true; /* For skip_member() and friends
 				to work correctly */
@@ -1541,12 +1548,19 @@ is_dumpdir (struct tar_stat_info *stat_info)
   return stat_info->is_dumpdir;
 }
 
-static bool
-dumpdir_ok (char *dumpdir)
+bool
+dumpdir_ok (char const *dumpdir, idx_t size)
 {
-  char *p;
+  char const *p;
   bool has_tempdir = false;
   char expect = '\0';
+
+  if (!(size > 0 &&
+	dumpdir[size-1] == 0 && (size == 1 || dumpdir[size-2] == 0)))
+    {
+      paxerror (0, _("Malformed dumpdir: missing terminator"));
+      return false;
+    }
 
   for (p = dumpdir; *p; p += strlen (p) + 1)
     {
@@ -1640,29 +1654,16 @@ purge_directory (char const *directory_name)
        case, we don't have to delete any files out of it.  */
     return;
 
-  /* Verify if dump directory is sane */
-  if (!dumpdir_ok (current_stat_info.dumpdir))
-    return;
-
   /* Process renames */
   for (arc = current_stat_info.dumpdir; *arc; arc += strlen (arc) + 1)
     {
       if (*arc == 'X')
 	{
 	  static char const TEMP_DIR_TEMPLATE[] = "tar.XXXXXX";
-	  idx_t topsize
-	    = one_top_level_dir ? strlen (one_top_level_dir) + 1 : 0;
 	  char *d = safer_name_suffix (arc + 1, false, absolute_names_option);
 	  idx_t len = strlen (d);
-	  temp_stub = xrealloc (temp_stub,
-				topsize + len + 1 + sizeof TEMP_DIR_TEMPLATE);
-	  char *copy_end = temp_stub;
-	  if (topsize)
-	    {
-	      copy_end = mempcpy (copy_end, one_top_level_dir, topsize - 1);
-	      *copy_end++ = '/';
-	    }
-	  copy_end = mempcpy (copy_end, d, len);
+	  temp_stub = xrealloc (temp_stub, len + 1 + sizeof TEMP_DIR_TEMPLATE);
+	  char *copy_end = mempcpy (temp_stub, d, len);
 	  *copy_end = '/';
 	  memcpy (copy_end + !ISSLASH (copy_end[-1]), TEMP_DIR_TEMPLATE,
 		  sizeof TEMP_DIR_TEMPLATE);

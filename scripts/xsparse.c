@@ -352,7 +352,7 @@ main (int argc, char **argv)
   char *xheader_file = NULL;
 
   progname = argv[0];
-  while ((c = getopt (argc, argv, "hnvx:")) != EOF)
+  while (0 <= (c = getopt (argc, argv, "hnvx:")))
     {
       switch (c)
 	{

@@ -1,4 +1,6 @@
-# Copyright 2006-2026 Free Software Foundation, Inc.
+# Check failed parent lookup does not corrupt the directory cache. -*- Autotest -*-
+
+# Copyright 2026 Free Software Foundation, Inc.
 
 # This file is part of GNU tar.
 
@@ -15,14 +17,21 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-1{s,/\*,@comment ,
-b
-}
-2,/.*\*\//{s,\*/,,;s/^/@comment/
-b
-}
-/\/* END \*\//,$d
-s/\([{}]\)/@\1/g
-s,/\*,&@r{,
-s,\*/,}&,
-s/ö/@"{o}/g
+AT_SETUP([failed parent lookup and directory cache])
+AT_KEYWORDS([extract extrac35 chdir])
+
+AT_TAR_CHECK([
+mkdir -p src/a src/b dest
+printf 'one\n' > src/a/one
+printf 'two\n' > src/b/two
+
+tar -cf archive.tar -C src --no-recursion a/one b/two &&
+tar -xf archive.tar -C dest &&
+test -f dest/a/one &&
+test -f dest/b/two &&
+test ! -e dest/a/two &&
+cmp src/a/one dest/a/one &&
+cmp src/b/two dest/b/two
+])
+
+AT_CLEANUP

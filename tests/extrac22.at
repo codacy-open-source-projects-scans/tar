@@ -18,7 +18,7 @@
 
 AT_SETUP([delay-directory-restore on reversed ordering])
 
-# The --delay-directory-resore option worked incorrectly on archives with
+# The --delay-directory-restore option worked incorrectly on archives with
 # reversed member ordering (which was documented, anyway). This is illustrated
 # in
 #   http://lists.gnu.org/archive/html/bug-tar/2019-03/msg00022.html

@@ -33,6 +33,7 @@ struct vcs_ignore_file
   int flags;
   add_fn addfn;
   void *(*initfn) (void *);
+  int (*matchfn) (struct exclude *, char const *);
   void *data;
 };
 
@@ -66,7 +67,10 @@ struct exclist
 {
   struct exclist *next, *prev;
   int flags;
+  char *prefix;
+  size_t prefix_len;
   struct exclude *excluded;
+  struct vcs_ignore_file *vcs;
 };
 
 void
@@ -111,6 +115,9 @@ info_attach_exclist (struct tar_stat_info *dir)
 	  struct exclist *ent = xmalloc (sizeof *ent);
 	  ent->excluded = ex;
 	  ent->flags = file->flags;
+	  ent->prefix_len = strlen (dir->orig_file_name);
+	  ent->prefix = xstrdup (dir->orig_file_name);
+	  ent->vcs = vcsfile;
 	  ent->prev = tail;
 	  ent->next = NULL;
 
@@ -133,6 +140,7 @@ info_free_exclist (struct tar_stat_info *dir)
     {
       struct exclist *next = ep->next;
       free_exclude (ep->excluded);
+      free (ep->prefix);
       free (ep);
       ep = next;
     }
@@ -146,9 +154,8 @@ bool
 excluded_name (char const *name, struct tar_stat_info *st)
 {
   struct exclist *ep;
-  const char *rname = NULL;
   char *bname = NULL;
-  bool result;
+  int result;
   int nr = 0;
 
   name += FILE_SYSTEM_PREFIX_LEN (name);
@@ -160,30 +167,46 @@ excluded_name (char const *name, struct tar_stat_info *st)
   if (!st)
     return false;
 
-  for (result = false; st && !result; st = st->parent, nr = EXCL_NON_RECURSIVE)
+  for (result = 0; st; st = st->parent, nr = EXCL_NON_RECURSIVE)
     {
       for (ep = st->exclude_list; ep; ep = ep->next)
 	{
+	  const char *rname;
+
 	  if (ep->flags & nr)
 	    continue;
-	  if ((result = excluded_file_name (ep->excluded, name)))
-	    break;
 
-	  if (!rname)
+	  result = excluded_file_name_status (ep->excluded, name);
+	  if (result & EXCLUDED_MATCHED)
+	    goto end;
+
+	  if (ep->prefix_len && strlen (name) > ep->prefix_len &&
+	      memcmp (name, ep->prefix, ep->prefix_len) == 0)
+	    rname = name + ep->prefix_len;
+	  else
 	    rname = name + dotslashlen (name);
-	  if ((result = excluded_file_name (ep->excluded, rname)))
-	    break;
+	  result = excluded_file_name_status (ep->excluded, rname);
+	  if (result & EXCLUDED_MATCHED)
+	    goto end;
+
+	  if (ep->vcs->matchfn)
+	    {
+	      result = ep->vcs->matchfn (ep->excluded, rname);
+	      if (result & EXCLUDED_MATCHED)
+		goto end;
+	    }
 
 	  if (!bname)
 	    bname = base_name (name);
-	  if ((result = excluded_file_name (ep->excluded, bname)))
-	    break;
+	  result = excluded_file_name_status (ep->excluded, bname);
+	  if (result & EXCLUDED_MATCHED)
+	    goto end;
 	}
     }
-
+ end:
   free (bname);
 
-  return result;
+  return (result & EXCLUDED_MATCHED) ? (result & EXCLUDED_EXCLUDED) : 0;
 }
 
 static void
@@ -210,9 +233,30 @@ git_addfn (struct exclude *ex, char const *pattern, int options,
     ++pattern;
   if (*pattern == 0 || *pattern == '#')
     return;
-  if (*pattern == '\\' && pattern[1] == '#')
+  if (*pattern == '\\' && (pattern[1] == '#' || pattern[1] == '!'))
     ++pattern;
+  else if (*pattern == '!')
+    {
+      ++pattern;
+      options |= EXCLUDE_INCLUDE;
+    }
+  else if (*pattern == '/')
+    {
+      options |= EXCLUDE_ANCHORED;
+    }
   add_exclude (ex, pattern, options);
+}
+
+static int
+git_matchfn (struct exclude *ex, char const *name)
+{
+  int rc;
+  char *rname = xmalloc (strlen (name) + 2);
+  rname[0] = '/';
+  strcpy (rname + 1, name);
+  rc = excluded_file_name_status (ex, rname);
+  free (rname);
+  return rc;
 }
 
 static void
@@ -293,18 +337,35 @@ hg_addfn (struct exclude *ex, char const *pattern, int options, void *data)
 }
 
 static struct vcs_ignore_file vcs_ignore_files[] = {
-  { ".cvsignore", EXCL_NON_RECURSIVE, cvs_addfn, NULL, NULL },
-  { ".gitignore", 0, git_addfn, NULL, NULL },
-  { ".bzrignore", 0, bzr_addfn, NULL, NULL },
-  { ".hgignore",  0, hg_addfn, hg_initfn, NULL },
-  { NULL, 0, git_addfn, NULL, NULL }
+  {
+    .filename = ".cvsignore",
+    .flags = EXCL_NON_RECURSIVE,
+    .addfn = cvs_addfn
+  },
+  {
+    .filename = ".gitignore",
+    .addfn = git_addfn,
+    .matchfn = git_matchfn
+  },
+  {
+    .filename = ".bzrignore",
+    .addfn = bzr_addfn
+  },
+  {
+    .filename = ".hgignore",
+    .addfn = hg_addfn,
+    .initfn = hg_initfn
+  },
+  {
+    .addfn = git_addfn
+  }
 };
 
 static struct vcs_ignore_file *
 get_vcs_ignore_file (const char *name)
 {
-  struct vcs_ignore_file *p;
-
+  struct vcs_ignore_file *p
+;
   for (p = vcs_ignore_files; p->filename; p++)
     if (streq (p->filename, name))
       break;

@@ -24,7 +24,7 @@ manipulate without using the @command{tar} utility or Tar mode in
 @acronym{GNU} Emacs.
 
 Physically, an archive consists of a series of file entries terminated
-by an end-of-archive entry, which consists of two 512 blocks of zero
+by an end-of-archive entry, which consists of two 512-byte blocks of zero
 bytes.  A file
 entry usually describes one of the files in the archive (an
 @dfn{archive member}), and consists of a file header and the contents
@@ -242,10 +242,10 @@ FIFO file archives the existence of this file and not its contents.
 
 @item @code{CONTTYPE}
 This specifies a contiguous file, which is the same as a normal
-file except that, in operating systems which support it, all its
-space is allocated contiguously on the disk.  Operating systems
-which do not allow contiguous allocation should silently treat this
-type as a normal file.
+file except that in the old RTU operating system that implemented it,
+all the file space was allocated contiguously on disk.
+Today's operating systems do not consider contiguous files to be a
+separate type, and @command{tar} extracts these files like regular files.
 
 @item @code{A} @dots{} @code{Z}
 These are reserved for custom implementations.  Some of these are
